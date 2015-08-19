@@ -1,14 +1,16 @@
 .PHONY: clean all realclean test bench
 
-tests:=test_smallsort
+tests := test_smallsort
+benches := bench_smallsort
 
-all: $(tests)
+
+all: $(tests) $(benches)
 
 clean:
 	rm -f gtest-all.o gtest_main.o
 
 realclean: clean
-	rm -f $(tests) libgtestmain.a
+	rm -f $(tests) $(benches) libgtestmain.a
 
 CXXFLAGS=-std=c++11 -g -Ofast -march=native -pthread
 
@@ -43,32 +45,27 @@ libgtestmain.a: gtest-all.o gtest_main.o
 
 # build tests
 
-test_smallsort: CPPFLAGS+=-I$(top)/include
+test_smallsort: CPPFLAGS+=-I$(top)/include -isystem $(GTEST_DIR)/include
 test_smallsort: LDLIBS+=-L. -lgtestmain
-test_smallsort: ../include/smallsort.h libgtestmain.a
-test_smallsort: test_smallsort.cc
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS) 
+test_smallsort: test_smallsort.cc ../include/smallsort.h libgtestmain.a
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS) 
 
 
 # run tests
 
-test: test_smallsort
+test: $(tests)
 	for test in $^; do ./$$test; done
 
 
 # build benchmark
 
 bench_smallsort: CPPFLAGS+=-I$(top)/include
-bench_smallsort: ../include/smallsort.h
-bench_smallsort: bench_smallsort.cc
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS) 
+bench_smallsort: bench_smallsort.cc ../include/smallsort.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS) 
 
 
 # run benchmarks
-bench: bench_smallsort
-	perf stat ./bench_smallsort array3d
-	perf stat ./bench_smallsort array4d
-	perf stat ./bench_smallsort array25f
-	perf stat ./bench_smallsort vec3d
-	perf stat ./bench_smallsort vec8f
+bench: $(benches)
+	./bench_smallsort
+
 

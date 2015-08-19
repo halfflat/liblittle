@@ -4,27 +4,35 @@
 #include <array>
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
 #include <chrono>
 #include <stdexcept>
 
 #include "smallsort.h"
 
+// SIMD vector types behave badly in templates for older gcc
+#if __GNUC__ >= 5 || defined(__ICC)
+#define RUN_VECTOR 1
+#endif
+
 const char *usage_str=
     "Usage: bench_smallsort [OPTION]...\n"
     "Benchmark smallsort routines over a series of small arrays or vectors.\n\n"
     "  -n N        Run N iterations of timing loop (default: 10000)\n"
-    "  -c N        Sort vector of N small arrays/vectors at a time (default 2000).\n"
+    "  -c N        Sort vector of N small arrays/vectors at a time (default 1000).\n"
+    "  -S          Compare with std::sort.\n"
     "  -h, --help  Display this help and exit.\n\n"
-    "Tests are performed over the following small arrays/vectors:\n"
-    "  array3d   -- std::array<double,3>\n"
-    "  array4d   -- std::array<double,3>\n"
-    "  array25f  -- std::array<float,25>\n"
-    "  vec4d     -- double __attribute__((vector_size(32)))\n"
-    "  vec8f     -- float __attribute__((vector_size(32)))\n";
+    "Tests are performed over a series of small arrays/vectors:\n"
+    "  array:Nd   -- std::array<double,N>\n"
+    "  array:Nf   -- std::array<float,N>\n"
+    "  vector:Nd  -- double __attribute__((vector_size(N*8)))\n"
+    "  vector:Nf  -- float __attribute__((vector_size(N*4)))\n"
+    "Vector versions may not be included, depending on platform.\n\n"
+    "Reported times are the minima observed over the timing iterations.\n";
 
 void usage(const std::string &msg="") {
-    if (msg) {
-        std::cerr << "bench_smallsort: " << msg << "\n";
+    if (!msg.empty()) {
+        std::cerr << "bench_smallsort: " << msg << "\n"
                   << "Try 'bench_smallort --help' for more information.\n";
         exit(2);
     }
@@ -56,33 +64,53 @@ void assert_sorted(V x) {
 
 struct run_options {
     size_t n_iter=10000;
-    size_t n_item=2000;
+    size_t n_item=1000;
+    bool std_sort_cmp=false;
 };
 
 template <typename V>
 void run(const char *name,const run_options &R) {
+    constexpr double inf=std::numeric_limits<double>::infinity();
+    constexpr int n=elem_traits<V>::size();
+
     std::vector<V> data(R.n_item);
-    std::chrono::duration<double,std::micro> t(0);
+    std::chrono::duration<double,std::micro> t_small(inf),t_std(inf);
 
     for (size_t i=0;i<R.n_iter;++i) {
         std::generate(data.begin(),data.end(),random_vec<V>);
         auto t0=std::chrono::high_resolution_clock::now();
-        for (auto &x: data) x=small_sort<elem_traits<V>::size()>(x);
+        for (auto &x: data) x=small_sort<n>(x);
         auto t1=std::chrono::high_resolution_clock::now();
-        t+=t1-t0;
+        auto dt=t1-t0;
+        if (t_small>dt) t_small=dt;
+        for (const auto &x: data) assert_sorted(x);
+
+        if (!R.std_sort_cmp) continue;
+
+        std::generate(data.begin(),data.end(),random_vec<V>);
+        t0=std::chrono::high_resolution_clock::now();
+        for (auto &x: data) std::sort(&x[0],&x[0]+n);
+        t1=std::chrono::high_resolution_clock::now();
+        dt=t1-t0;
+        if (t_std>dt) t_std=dt;
         for (const auto &x: data) assert_sorted(x);
     }
-    std::cout << std::setw(10) << name << t.count() << " µs\n";
+    std::cout << std::setprecision(3) << std::fixed;
+    std::cout << name << '\t' << t_small.count() << " µs";
+    if (R.std_sort_cmp) std::cout << '\t' << t_std.count() << " µs";
+    std::cout << '\n';
 }
 
 run_options parse_args(int argc,char **argv) {
     run_options R;
 
+    --argc;
+    ++argv;
     while (argc>0) {
         if (!strcmp(argv[0],"-n")) {
             if (argc<1) usage("option '-n' requires an argument");
             R.n_iter=strtoul(argv[1],0,0);
-            if (R.n_iter<1) usage("invalid iteration count: "+string(argv[1]));
+            if (R.n_iter<1) usage("invalid iteration count: "+std::string(argv[1]));
             argc-=2;
             argv+=2;
             continue;
@@ -90,9 +118,15 @@ run_options parse_args(int argc,char **argv) {
         if (!strcmp(argv[0],"-c")) {
             if (argc<1) usage("option '-c' requires an argument");
             R.n_item=strtoul(argv[1],0,0);
-            if (R.n_item<1) usage("invalid item count: "+string(argv[1]));
+            if (R.n_item<1) usage("invalid item count: "+std::string(argv[1]));
             argc-=2;
             argv+=2;
+            continue;
+        }
+        if (!strcmp(argv[0],"-S")) {
+            R.std_sort_cmp=true;
+            --argc;
+            ++argv;
             continue;
         }
         if (!strcmp(argv[0],"-h") || !strcmp(argv[0],"--help")) usage();
@@ -104,22 +138,52 @@ run_options parse_args(int argc,char **argv) {
     return R;
 }
 
-typedef std::array<double,3> array3d;
-typedef std::array<double,4> array4d;
-typedef std::array<float,25> array25f;
+#if RUN_VECTOR
 typedef double __attribute__((vector_size(4*sizeof(double)))) vec4d;
 typedef float __attribute__((vector_size(8*sizeof(float)))) vec8f;
+#endif
 
 int main(int argc,char **argv) {
-    if (argc!=2 && argc!=3) usage();
-
     run_options R=parse_args(argc,argv);
 
-    run<array3d>("array3d",R);
-    run<array4d>("array4d",R);
-    run<array25f>("array25f",R);
-    run<vec4d>("vec4d",R);
-    run<vec8f>("vec8f",R);
+#define RUN_DBL_ARRAY(n) run<std::array<double,n>>("array:" #n "d",R)
+#define RUN_FLT_ARRAY(n) run<std::array<float,n>>("array:" #n "f",R)
+
+    RUN_DBL_ARRAY(3);
+    RUN_DBL_ARRAY(4);
+    RUN_DBL_ARRAY(5);
+    RUN_DBL_ARRAY(6);
+    RUN_DBL_ARRAY(7);
+    RUN_DBL_ARRAY(8);
+    RUN_DBL_ARRAY(9);
+    RUN_DBL_ARRAY(10);
+    RUN_DBL_ARRAY(11);
+    RUN_DBL_ARRAY(12);
+    RUN_DBL_ARRAY(13);
+    RUN_DBL_ARRAY(14);
+    RUN_DBL_ARRAY(15);
+    RUN_DBL_ARRAY(16);
+    RUN_DBL_ARRAY(17);
+    RUN_DBL_ARRAY(18);
+    RUN_DBL_ARRAY(19);
+    RUN_DBL_ARRAY(20);
+    RUN_DBL_ARRAY(21);
+    RUN_DBL_ARRAY(22);
+    RUN_DBL_ARRAY(23);
+    RUN_DBL_ARRAY(24);
+    RUN_DBL_ARRAY(25);
+
+    RUN_FLT_ARRAY(4);
+    RUN_FLT_ARRAY(8);
+    RUN_FLT_ARRAY(12);
+    RUN_FLT_ARRAY(16);
+    RUN_FLT_ARRAY(20);
+    RUN_FLT_ARRAY(24);
+
+#if RUN_VECTOR
+    run<vec4d>("vector:4d",R);
+    run<vec8f>("vector:8f",R);
+#endif
 
     return 0;
 }
