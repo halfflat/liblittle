@@ -6,20 +6,41 @@
 
 #include <utility>
 #include <algorithm>
+#include <type_traits>
 #include <iostream>
 
 namespace impl {
+    template <bool use_min_max=false>
+    struct reorder {
+        template <typename V>
+        static void run(V &a,V &b) {
+            if (a>b) std::swap(a,b);
+        }
+    };
+
+    template <>
+    struct reorder<true> {
+        template <typename V>
+        static void run(V &a,V &b) {
+            V l=std::min(a,b);
+            V u=std::max(a,b);
+            a=l;
+            b=u;
+        }
+    };
+
     template <int m,int n>
     struct S {
         template <typename A>
         [[gnu::always_inline]] static void run(A &a) {
-            if (a[m]>a[n]) std::swap(a[m],a[n]);
+            using value_type=typename std::remove_reference<decltype(a[m])>::type;
+            reorder<std::is_arithmetic<value_type>::value>::run(a[m],a[n]);
         }
     };
 
     // merging networks
 
-    // swap m/2 adjacent pairs (m0,m0+1),(m0+2,m0+3),...
+    // swap m/2 k-spaced pairs (m0,m0+k),(m0+2k,m0+3k),...
     template <int m,int m0,int k,typename A>
     struct pairwise_exchange {
         [[gnu::always_inline]] static void run(A &a) {
@@ -64,7 +85,7 @@ namespace impl {
         [[gnu::always_inline]] static void run(A &a) { S<m0,n0>::run(a); }
     };
 
-    // minimal networks up to 5, then recusive merge
+    // minimal networks up to 6, then recusive merge
 
     template <int n,int n0,typename A>
     struct small_sort_inplace {
