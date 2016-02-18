@@ -1,6 +1,6 @@
 .PHONY: clean all realclean test bench
 
-tests := test_smallsort
+tests := test_smallsort test_tiny_multiset
 benches := bench_smallsort
 
 
@@ -50,6 +50,11 @@ test_smallsort: LDLIBS+=-L. -lgtestmain
 test_smallsort: test_smallsort.cc ../include/smallsort.h libgtestmain.a
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS) 
 
+
+test_tiny_multiset: CPPFLAGS+=-I$(top)/include -isystem $(GTEST_DIR)/include
+test_tiny_multiset: LDLIBS+=-L. -lgtestmain
+test_tiny_multiset: test_tiny_multiset.cc ../include/tiny_multiset.h libgtestmain.a
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS) 
 
 # run tests
 
