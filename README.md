@@ -1,4 +1,5 @@
-liblittle: header-only containers and algorithms for small data structures
+# liblittle
+**Header-only containers and algorithms for small data structures.**
 
 ## Motivation
 
