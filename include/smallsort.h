@@ -22,10 +22,9 @@ namespace impl {
     struct reorder<true> {
         template <typename V>
         static void run(V &a,V &b) {
-            V l=std::min(a,b);
-            V u=std::max(a,b);
+            V l=a<b?a:b;
+            b=a<b?b:a;
             a=l;
-            b=u;
         }
     };
 

@@ -25,6 +25,7 @@ const char *usage_str=
     "Tests are performed over a series of small arrays/vectors:\n"
     "  array:Nd   -- std::array<double,N>\n"
     "  array:Nf   -- std::array<float,N>\n"
+    "  array:Ni   -- std::array<int,N>\n"
     "  vector:Nd  -- double __attribute__((vector_size(N*8)))\n"
     "  vector:Nf  -- float __attribute__((vector_size(N*4)))\n"
     "Vector versions may not be included, depending on platform.\n\n"
@@ -148,7 +149,7 @@ int main(int argc,char **argv) {
 
 #define RUN_DBL_ARRAY(n) run<std::array<double,n>>("array:" #n "d",R)
 #define RUN_FLT_ARRAY(n) run<std::array<float,n>>("array:" #n "f",R)
-
+#define RUN_INT_ARRAY(n) run<std::array<int,n>>("array:" #n "i",R)
     RUN_DBL_ARRAY(3);
     RUN_DBL_ARRAY(4);
     RUN_DBL_ARRAY(5);
@@ -179,6 +180,25 @@ int main(int argc,char **argv) {
     RUN_FLT_ARRAY(16);
     RUN_FLT_ARRAY(20);
     RUN_FLT_ARRAY(24);
+
+    RUN_INT_ARRAY(3);
+    RUN_INT_ARRAY(4);
+    RUN_INT_ARRAY(5);
+    RUN_INT_ARRAY(6);
+    RUN_INT_ARRAY(7);
+    RUN_INT_ARRAY(8);
+    RUN_INT_ARRAY(9);
+    RUN_INT_ARRAY(10);
+    RUN_INT_ARRAY(11);
+    RUN_INT_ARRAY(12);
+    RUN_INT_ARRAY(13);
+    RUN_INT_ARRAY(14);
+    RUN_INT_ARRAY(15);
+    RUN_INT_ARRAY(16);
+    RUN_INT_ARRAY(17);
+    RUN_INT_ARRAY(18);
+    RUN_INT_ARRAY(19);
+    RUN_INT_ARRAY(20);
 
 #if RUN_VECTOR
     run<vec4d>("vector:4d",R);
