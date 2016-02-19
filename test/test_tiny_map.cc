@@ -24,6 +24,7 @@ void reset_counts() {
 }
 
 struct int_nontrivial {
+    int_nontrivial() { ++g_ctor_count; }
     int_nontrivial(int n_): n(n_) { ++g_ctor_count; }
     int_nontrivial(const int_nontrivial &x): n(x.n) { ++g_ctor_count; }
     int_nontrivial(int_nontrivial &&x): n(x.n) { ++g_ctor_count; }
@@ -33,23 +34,13 @@ struct int_nontrivial {
 
     ~int_nontrivial() { ++g_dtor_count; }
 
+//    bool operator==(const int_nontrivial &x) const { return n==x.n; }
     operator int() const { return n; }
     int n;
 };
 
 
-// temporary...
-namespace std {
-    template <>
-    struct hash<int_nontrivial> {
-        std::size_t operator()(const int_nontrivial &x) const {
-            return std::hash<int>()(x.n);
-        }
-    };
-}
-
 //using multiset_types=::testing::Types<tiny_multiset<int,20>,tiny_multiset<int_nontrivial,20>,small_multiset<int>>;
-//using map_types=::testing::Types<std::unordered_map<int,int>,std::unordered_map<int_nontrivial,int_nontrivial>>;
 using map_types=::testing::Types<small_map<int,int>,small_map<int_nontrivial,int_nontrivial>>;
 TYPED_TEST_CASE(xmap,map_types);
 
@@ -109,104 +100,98 @@ TYPED_TEST(xmap,clear) {
     ASSERT_EQ(g_dtor_count,g_ctor_count);
 }
 
-#if 0
-
-TYPED_TEST(xmultiset,equality) {
-    using value_type=typename TestFixture::value_type;
-    using mset=TypeParam;
+TYPED_TEST(xmap,equality) {
+    using map=TypeParam;
     
-    mset m1({1,2,3,2,3,4,3,4,5});
-    mset m2({5,4,4,2,3,2,3,3,1});
-    mset m3({5,4,4,2,3,2,3,3});
-    mset m4({5,4,4,2,3,2,3,3,2});
+    map m1({{1,1},{3,2},{4,1},{3,7}});
+    map m2({{3,7},{1,1},{4,1}});
+    map m3({{3,7},{1,1},{4,1},{1,2}});
+    map m4({{3,7},{1,1},{4,1},{5,6}});
 
     ASSERT_EQ(m1,m2);
     ASSERT_NE(m1,m3);
     ASSERT_NE(m1,m4);
 }
 
-TYPED_TEST(xmultiset,insert) {
+TYPED_TEST(xmap,insert) {
     using value_type=typename TestFixture::value_type;
-    using mset=TypeParam;
+    using map=TypeParam;
 
     reset_counts();
 
     {
-        mset m;
-        value_type v(3);
+        map m;
+        value_type v(3,8);
 
         m.insert(v);
-        m.insert(value_type(4));
+        m.insert(value_type(4,9));
 
-        mset m_bis({4,3});
+        map m_bis({{4,9},{3,8}});
         ASSERT_EQ(m,m_bis);
     }
 
     ASSERT_EQ(g_dtor_count,g_ctor_count);
 }
 
-TYPED_TEST(xmultiset,swap) {
-    using value_type=typename TestFixture::value_type;
-    using mset=TypeParam;
+TYPED_TEST(xmap,swap) {
+    using map=TypeParam;
 
     reset_counts();
 
     {
-        mset m1({1,2,3,2,3,4,3,4,5});
-        mset m1_copy=m1;
+        map m1({{3,9},{4,1}});
+        map m2({{3,7},{1,1},{4,1},{5,6}});
 
-        mset m2({7,6,6,5});
-        mset m2_copy=m2;
+        map m1_copy=m1;
+        map m2_copy=m2;
 
         m1.swap(m2);
 
         ASSERT_EQ(4,m1.size());
         ASSERT_EQ(m2_copy,m1);
 
-        ASSERT_EQ(9,m2.size());
+        ASSERT_EQ(2,m2.size());
         ASSERT_EQ(m1_copy,m2);
     }
 
     ASSERT_EQ(g_dtor_count,g_ctor_count);
 }
 
-TYPED_TEST(xmultiset,count) {
-    using value_type=typename TestFixture::value_type;
-    using mset=TypeParam;
+TYPED_TEST(xmap,count) {
+    using map=TypeParam;
 
-    mset m1({1,2,3,2,3,4,3,4,5});
+    map m1({{1,2},{3,2},{3,5},{4,5}});
     ASSERT_EQ(1,m1.count(1));
-    ASSERT_EQ(2,m1.count(2));
-    ASSERT_EQ(3,m1.count(3));
-    ASSERT_EQ(2,m1.count(4));
-    ASSERT_EQ(1,m1.count(5));
+    ASSERT_EQ(0,m1.count(2));
+    ASSERT_EQ(1,m1.count(3));
+    ASSERT_EQ(1,m1.count(4));
+    ASSERT_EQ(0,m1.count(5));
 }
 
-TYPED_TEST(xmultiset,erase) {
-    using value_type=typename TestFixture::value_type;
-    using mset=TypeParam;
+TYPED_TEST(xmap,erase) {
+    using map=TypeParam;
 
     reset_counts();
 
     {
-        mset m1({1,2,3,4,4,5});
-        ASSERT_EQ(2,m1.erase(4));
+        map m1({{1,2},{3,4},{4,5},{3,7}});
+        ASSERT_EQ(1,m1.erase(4));
         ASSERT_EQ(0,m1.erase(4));
         ASSERT_EQ(1,m1.erase(3));
-        ASSERT_EQ(3,m1.size());
+        ASSERT_EQ(1,m1.size());
     }
 
     ASSERT_EQ(g_dtor_count,g_ctor_count);
 }
 
-TYPED_TEST(xmultiset,iter_erase) {
+TYPED_TEST(xmap,iter_erase) {
     using value_type=typename TestFixture::value_type;
-    using mset=TypeParam;
+    using map=TypeParam;
 
     reset_counts();
 
     {
-        mset m1({1,2,3,2,3,4,3,4,5});
+        map m1({{1,2},{3,2},{3,4},{4,5},{5,6},{7,8}});
         size_t initial_size=m1.size();
         int leap=3;
 
@@ -226,11 +211,63 @@ TYPED_TEST(xmultiset,iter_erase) {
     ASSERT_EQ(g_dtor_count,g_ctor_count);
 }
 
+TYPED_TEST(xmap,bracket) {
+    using map=TypeParam;
+
+    reset_counts();
+
+    {
+        map m1;
+        m1[3]=5;
+
+        ASSERT_EQ(1,m1.size());
+        ASSERT_EQ(5,m1[3]);
+
+        m1[3]=4;
+        ASSERT_EQ(1,m1.size());
+        ASSERT_EQ(4,m1[3]);
+    }
+
+    ASSERT_EQ(g_dtor_count,g_ctor_count);
+}
+
+TYPED_TEST(xmap,at) {
+    using map=TypeParam;
+
+    reset_counts();
+
+    {
+        map m1({{1,2},{2,3}});
+        ASSERT_NO_THROW(m1.at(1));
+        ASSERT_NO_THROW(m1.at(2));
+        ASSERT_EQ(2,m1.at(1));
+        ASSERT_EQ(3,m1.at(2));
+
+        m1.at(2)=5;
+        ASSERT_EQ(5,m1.at(2));
+
+        ASSERT_THROW(m1.at(9),std::out_of_range);
+
+        // check const version too...
+        const map &m2(m1);
+        ASSERT_NO_THROW(m2.at(1));
+        ASSERT_NO_THROW(m2.at(2));
+        ASSERT_EQ(2,m2.at(1));
+        ASSERT_EQ(5,m2.at(2));
+
+        ASSERT_THROW(m2.at(9),std::out_of_range);
+    }
+
+    ASSERT_EQ(g_dtor_count,g_ctor_count);
+}
+
+
 template <typename T>
-class xmultiset_nonstd_eq: public ::testing::Test {
+class xmap_nonstd_eq: public ::testing::Test {
 public:
-    typedef typename T::value_type value_type;
     typedef typename T::key_equal key_equal;
+    typedef typename T::value_type value_type;
+    typedef typename T::mapped_type mapped_type;
 };
 
 // non-standard stateful equality functor
@@ -242,49 +279,31 @@ struct eq_mod_k {
     int k;
 };
 
-using multiset_nonstd_eq_types=::testing::Types<tiny_multiset<int,20,eq_mod_k>,tiny_multiset<int_nontrivial,20,eq_mod_k>,small_multiset<int,eq_mod_k>>;
-TYPED_TEST_CASE(xmultiset_nonstd_eq,multiset_nonstd_eq_types);
+//using map_nonstd_eq_types=::testing::Types<tiny_multiset<int,20,eq_mod_k>,tiny_multiset<int_nontrivial,20,eq_mod_k>,small_multiset<int,eq_mod_k>>;
+using map_nonstd_eq_types=::testing::Types<small_map<int,int,eq_mod_k>>;
+TYPED_TEST_CASE(xmap_nonstd_eq,map_nonstd_eq_types);
 
-TYPED_TEST(xmultiset_nonstd_eq,count) {
-    using value_type=typename TestFixture::value_type;
-    using mset=TypeParam;
+TYPED_TEST(xmap_nonstd_eq,count) {
+    using map=TypeParam;
 
     // default eq_mod_k is mod 2 (i.e. equal if same parity)
-    mset m1({1,2,3,4,5});
-    ASSERT_EQ(3,m1.count(1));
-    ASSERT_EQ(2,m1.count(2));
+    map m1({{1,2},{3,4},{4,5}});
+    ASSERT_EQ(2,m1.size());
+    ASSERT_EQ(4,m1.at(3));
+    ASSERT_EQ(4,m1.at(1));
     
     // test with stateful eq_mod_k, k==3
-    mset m2({1,2,3,4,5},eq_mod_k(3));
-    ASSERT_EQ(2,m2.count(1));
-    ASSERT_EQ(2,m2.count(2));
-    ASSERT_EQ(1,m2.count(3));
-}
-
-TYPED_TEST(xmultiset_nonstd_eq,erase) {
-    using value_type=typename TestFixture::value_type;
-    using mset=TypeParam;
-
-    mset m2({1,2,3,4,5},eq_mod_k(3));
-    ASSERT_EQ(5,m2.size());
-
-    size_t k=m2.erase(1);
-    ASSERT_EQ(2,k);
+    map m2({{1,2},{2,3},{3,4},{4,5}},eq_mod_k(3));
     ASSERT_EQ(3,m2.size());
-
-    k=m2.erase(2);
-    ASSERT_EQ(2,k);
-    ASSERT_EQ(1,m2.size());
+    ASSERT_EQ(5,m2.at(1));
 }
 
-TYPED_TEST(xmultiset_nonstd_eq,key_eq) {
-    using value_type=typename TestFixture::value_type;
+TYPED_TEST(xmap_nonstd_eq,key_eq) {
     using key_equal=typename TestFixture::key_equal;
-    using mset=TypeParam;
+    using map=TypeParam;
 
-    mset m({1,2,3,4,5},eq_mod_k(3));
+    map m({{1,2},{2,3},{3,4},{4,5}},eq_mod_k(3));
     key_equal eq=m.key_eq();
     ASSERT_EQ(3,eq.k);
 }
-#endif
 

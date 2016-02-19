@@ -116,13 +116,13 @@ public:
         std::swap(v,other.v);
     }
 
-    size_type count(const key_type &key) {
+    size_type count(const key_type &key) const {
         size_type c=0;
         for (const auto &k: v) c+=static_cast<bool>(eq(k,key));
         return c;
     }
 
-    iterator find(const key_type &key) {
+    iterator find(const key_type &key) const {
         auto b=v.begin();
         auto e=v.end();
         while (b!=e) if (eq(*b,key)) break; else ++b;
@@ -185,13 +185,13 @@ namespace impl {
         size_type size() const { return n; }
         size_type max_size() const { return N; }
 
-        size_type count(const key_type &key) {
+        size_type count(const key_type &key) const {
             size_type c=0;
             for (const auto &k: *this) c+=static_cast<bool>(eq(k,key));
             return c;
         }
 
-        iterator find(const key_type &key) {
+        iterator find(const key_type &key) const {
             auto b=begin();
             auto e=end();
             while (b!=e) if (eq(*b,key)) break; else ++b;

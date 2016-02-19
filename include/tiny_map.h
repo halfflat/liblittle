@@ -17,7 +17,7 @@
 
 /** Vector-backed small map */
 
-template <typename Key,typename Value,class KeyEqual=std::equal_to<Key>,class Allocator=std::allocator<Key>>
+template <typename Key,typename Value,class KeyEqual=std::equal_to<Key>,class Allocator=std::allocator<std::pair<Key,Value>>>
 struct small_map {
     typedef Key key_type;
     typedef Value mapped_type;
@@ -133,28 +133,53 @@ public:
         std::swap(v,other.v);
     }
 
-    size_type count(const key_type &key) {
+    size_type count(const key_type &key) const {
         return find(key)==end()?0:1;
     }
 
-private:
-    typename store_type::iterator find_in_store(const key_type &key) {
-        auto b=v.begin();
-        auto e=v.end();
-        while (b!=e) if (eq(b->first,key)) break; else ++b;
-        return b;
+    iterator find(const key_type &key) const {
+        return find_in_store(key);
     }
 
-public:
-    iterator find(const key_type &key) {
-        return find_in_store(key);
+    mapped_type &operator[](const Key &key) {
+        auto where=find_in_store(key);
+        if (where!=v.end()) return where->second;
+        v.emplace_back(std::piecewise_construct,std::forward_as_tuple(key),std::tuple<>());
+        return std::prev(v.end())->second;
+    }
+
+    mapped_type &operator[](Key &&key) {
+        auto where=find_in_store(key);
+        if (where!=v.end()) return where->second;
+        if (where!=end()) return where->second;
+        v.emplace_back(std::piecewise_construct,std::forward_as_tuple(std::move(key)),std::tuple<>());
+        return std::prev(v.end())->second;
+    }
+
+    mapped_type &at(const Key &key) {
+        auto where=find_in_store(key);
+        if (where!=v.end()) return where->second;
+        throw std::out_of_range("missing key");
+    }
+
+    const mapped_type &at(const Key &key) const {
+        auto where=find_in_store(key);
+        if (where!=v.end()) return where->second;
+        throw std::out_of_range("missing key");
     }
 
     KeyEqual key_eq() const { return eq; }
     Allocator get_allocator() const { return v.get_allocator(); }
 
     friend bool operator==(const small_map &a,const small_map &b) {
-        return std::is_permutation(a.begin(),a.end(),b.begin(),a.eq);
+        if (a.size()!=b.size()) return false;
+        auto bend=b.end();
+        for (const auto &e: a) {
+            auto bi=b.find(e.first);
+            if (bi==bend || e.second!=bi->second) return false;
+        }
+
+        return true;
     }
 
     friend bool operator!=(const small_map &a,const small_map &b) {
@@ -164,6 +189,20 @@ public:
 private:
     store_type v;
     KeyEqual eq;
+
+    typename store_type::const_iterator find_in_store(const key_type &key) const {
+        auto b=v.begin();
+        auto e=v.end();
+        while (b!=e) if (eq(b->first,key)) break; else ++b;
+        return b;
+    }
+
+    typename store_type::iterator find_in_store(const key_type &key) {
+        auto b=v.begin();
+        auto e=v.end();
+        while (b!=e) if (eq(b->first,key)) break; else ++b;
+        return b;
+    }
 };
 
 #if 0
