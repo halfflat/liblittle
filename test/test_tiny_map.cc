@@ -2,16 +2,12 @@
 #include <cmath>
 #include <gtest/gtest.h>
 
-#include <unordered_map>
-
 #include "tiny_map.h"
 
 template <typename T>
 class xmap: public ::testing::Test {
 public:
-    typedef typename T::key_type key_type;
     typedef typename T::value_type value_type;
-    typedef typename T::mapped_type mapped_type;
 };
 
 // use this to check for correct ctor, dtor behaviour in tiny_map
@@ -34,7 +30,6 @@ struct int_nontrivial {
 
     ~int_nontrivial() { ++g_dtor_count; }
 
-//    bool operator==(const int_nontrivial &x) const { return n==x.n; }
     operator int() const { return n; }
     int n;
 };
