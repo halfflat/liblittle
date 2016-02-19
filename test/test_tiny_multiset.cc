@@ -37,7 +37,7 @@ using multiset_types=::testing::Types<tiny_multiset<int,20>,tiny_multiset<int_no
 TYPED_TEST_CASE(xmultiset,multiset_types);
 
 
-TYPED_TEST(xmultiset,small_ctor) {
+TYPED_TEST(xmultiset,ctor) {
     using value_type=typename TestFixture::value_type;
     using mset=TypeParam;
 
@@ -64,6 +64,38 @@ TYPED_TEST(xmultiset,small_ctor) {
         mset m_move(std::move(m_ipair));
         
         ASSERT_EQ(m_copy.size(),m_move.size());
+    }
+
+    ASSERT_EQ(g_dtor_count,g_ctor_count);
+}
+
+TYPED_TEST(xmultiset,assign) {
+    using value_type=typename TestFixture::value_type;
+    using mset=TypeParam;
+
+    reset_counts();
+
+    {
+        std::vector<value_type> ns={3,3,4,4,4,5,5,5,5,3};
+        mset m1(ns.begin(),ns.end());
+
+        mset m2({1,2,3,2,3,4,3,4,5});
+
+        ASSERT_EQ(10,m1.size());
+        ASSERT_EQ(9,m2.size());
+
+        m2=m1;
+        ASSERT_EQ(10,m2.size());
+    
+        for (int i=3;i<=5;++i)
+            ASSERT_EQ(m1.count(i),m2.count(i));
+
+        mset m3({1,2,3,4,3,4,5});
+        m3=std::move(m2);
+        ASSERT_EQ(10,m3.size());
+    
+        for (int i=3;i<=5;++i)
+            ASSERT_EQ(m1.count(i),m3.count(i));
     }
 
     ASSERT_EQ(g_dtor_count,g_ctor_count);

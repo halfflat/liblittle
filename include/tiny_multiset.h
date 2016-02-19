@@ -57,8 +57,7 @@ public:
     small_multiset(I b,I e,const KeyEqual &eq_=KeyEqual(),
         const Allocator &alloc_=Allocator()): eq(eq_),v(b,e,alloc_) {}
 
-    template <typename T>
-    small_multiset(std::initializer_list<T> ilist,
+    small_multiset(std::initializer_list<Key> ilist,
         const KeyEqual &eq_=KeyEqual(),const Allocator &alloc_=Allocator())
         : eq(eq_),v(ilist,alloc_) {}
 
@@ -92,8 +91,7 @@ public:
         v.insert(v.end(),b,e);
     }
     
-    template <typename T>
-    void insert(std::initializer_list<T> ilist) {
+    void insert(std::initializer_list<Key> ilist) {
         v.insert(v.end(),ilist);
     }
 
@@ -118,13 +116,13 @@ public:
         std::swap(v,other.v);
     }
 
-    size_type count(const key_type &key) {
+    size_type count(const key_type &key) const {
         size_type c=0;
         for (const auto &k: v) c+=static_cast<bool>(eq(k,key));
         return c;
     }
 
-    iterator find(const key_type &key) {
+    iterator find(const key_type &key) const {
         auto b=v.begin();
         auto e=v.end();
         while (b!=e) if (eq(*b,key)) break; else ++b;
@@ -187,13 +185,13 @@ namespace impl {
         size_type size() const { return n; }
         size_type max_size() const { return N; }
 
-        size_type count(const key_type &key) {
+        size_type count(const key_type &key) const {
             size_type c=0;
             for (const auto &k: *this) c+=static_cast<bool>(eq(k,key));
             return c;
         }
 
-        iterator find(const key_type &key) {
+        iterator find(const key_type &key) const {
             auto b=begin();
             auto e=end();
             while (b!=e) if (eq(*b,key)) break; else ++b;
@@ -219,8 +217,7 @@ namespace impl {
             while (b!=e) insert(*b++);
         }
         
-        template <typename T>
-        void insert(std::initializer_list<T> ilist) {
+        void insert(std::initializer_list<Key> ilist) {
             insert(ilist.begin(),ilist.end());
         }
 
@@ -277,8 +274,7 @@ public:
         insert(b,e);
     }
 
-    template <typename T>
-    tiny_multiset(std::initializer_list<T> ilist,
+    tiny_multiset(std::initializer_list<Key> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
@@ -316,7 +312,7 @@ public:
 };
 
 
-// tiny_multiset with trivial value type
+// tiny_multiset with non-trivial value type
 template <typename Key,std::size_t N,class KeyEqual>
 struct tiny_multiset<Key,N,KeyEqual,false>: public impl::tiny_multiset_common<Key,N,KeyEqual>  {
 private:
@@ -350,8 +346,7 @@ public:
         insert(b,e);
     }
 
-    template <typename T>
-    tiny_multiset(std::initializer_list<T> ilist,
+    tiny_multiset(std::initializer_list<Key> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
@@ -365,8 +360,21 @@ public:
         for (auto &x: other) emplace(std::move(x));
     }
 
-    tiny_multiset &operator=(const tiny_multiset &) =default;
-    tiny_multiset &operator=(tiny_multiset &&) =default;
+    tiny_multiset &operator=(const tiny_multiset &other) {
+        if (this!=&other) {
+            clear();
+            insert(other.begin(),other.end());
+        }
+        return *this;
+    }
+
+    tiny_multiset &operator=(tiny_multiset &&other) {
+        if (this!=&other) {
+            clear();
+            for (auto &x: other) insert(std::move(x));
+        }
+        return *this;
+    }
 
     ~tiny_multiset() { clear(); }
 
