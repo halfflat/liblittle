@@ -1,29 +1,27 @@
-#ifndef TINY_MULTISET_H
-#define TINY_MULTISET_H
+#ifndef TINY_MAP_H
+#define TINY_MAP_H
 
 #include <algorithm>
 #include <iterator>
 #include <type_traits>
 #include <vector>
 
-/** Classes for handling small size multisets with a linear search implementation.
- *
- * Unlike a sorted container backed implementation, this has fast inserts (O(1))
- * but slow find and count operations (O(N) with small coefficient).
+/** Classes for handling small size maps with a linear search implementation.
  *
  * Implements the C++ UnorderedAssociativeContainer concept with the following exceptions:
  * 1. No equal_range() method
  * 2. No hash_function() method
  * 3. No emplace_hint() method
- * 4. No get_allocator() method for tiny_multiset.
+ * 4. No get_allocator() method for tiny_map.
  */
 
-/** Vector-backed small multiset */
+/** Vector-backed small map */
 
-template <typename Key,class KeyEqual=std::equal_to<Key>,class Allocator=std::allocator<Key>>
-struct small_multiset {
+template <typename Key,typename Value,class KeyEqual=std::equal_to<Key>,class Allocator=std::allocator<Key>>
+struct small_map {
     typedef Key key_type;
-    typedef key_type value_type;
+    typedef Value mapped_type;
+    typedef std::pair<key_type,mapped_type> value_type;
     typedef KeyEqual key_equal;
 
     typedef const value_type &const_reference;
@@ -31,7 +29,7 @@ struct small_multiset {
 
     typedef Allocator allocator_type;
 private:
-    typedef std::vector<key_type,allocator_type> store_type;
+    typedef std::vector<value_type,allocator_type> store_type;
 
 public:
     typedef typename store_type::size_type size_type;
@@ -40,29 +38,29 @@ public:
     typedef typename store_type::const_iterator const_iterator;
     typedef const_iterator iterator;
 
-    small_multiset(const small_multiset &) =default;
-    small_multiset(small_multiset &&) =default;
+    small_map(const small_map &) =default;
+    small_map(small_map &&) =default;
 
-    small_multiset(const KeyEqual &eq_=KeyEqual(),
+    explicit small_map(const KeyEqual &eq_=KeyEqual(),
         const Allocator &alloc_=Allocator()): eq(eq_),v(alloc_) {}
 
-    small_multiset(const Allocator &alloc_): v(alloc_) {}
+    explicit small_map(const Allocator &alloc_): v(alloc_) {}
 
-    small_multiset(const small_multiset &other,const Allocator &alloc_)
+    small_map(const small_map &other,const Allocator &alloc_)
         : v(other.v,alloc_) {}
-    small_multiset(small_multiset &&other,const Allocator &alloc_)
+    small_map(small_map &&other,const Allocator &alloc_)
         : v(std::move(other.v),alloc_) {}
 
     template <typename I>
-    small_multiset(I b,I e,const KeyEqual &eq_=KeyEqual(),
-        const Allocator &alloc_=Allocator()): eq(eq_),v(b,e,alloc_) {}
+    small_map(I b,I e,const KeyEqual &eq_=KeyEqual(),
+        const Allocator &alloc_=Allocator()): eq(eq_),v(alloc_) { insert(b,e); }
 
-    small_multiset(std::initializer_list<Key> ilist,
+    small_map(std::initializer_list<value_type> ilist,
         const KeyEqual &eq_=KeyEqual(),const Allocator &alloc_=Allocator())
-        : eq(eq_),v(ilist,alloc_) {}
+        : eq(eq_),v(alloc_) { insert(ilist); }
 
-    small_multiset &operator=(const small_multiset &) =default;
-    small_multiset &operator=(small_multiset &&) =default;
+    small_map &operator=(const small_map &) =default;
+    small_map &operator=(small_map &&) =default;
 
     const_iterator begin() const { return cbegin(); }
     const_iterator cbegin() const { return v.cbegin(); }
@@ -77,28 +75,46 @@ public:
     void clear() { v.clear(); }
 
     iterator insert(const value_type &value) {
-        v.push_back(value);
-        return std::prev(v.cend());
+        auto where=find_in_store(value.first);
+        if (where==v.end()) {
+            v.push_back(value);
+            return std::prev(v.end());
+        }
+        else {
+            *where=value;
+            return where;
+        }
     }
     
     iterator insert(value_type &&value) {
-        v.push_back(std::move(value));
-        return std::prev(v.cend());
+        auto where=find_in_store(value.first);
+        if (where==v.end()) {
+            v.push_back(std::move(value));
+            return std::prev(v.end());
+        }
+        else {
+            *where=std::move(value);
+            return where;
+        }
     }
 
     template <typename I>
     void insert(I b,I e) {
-        v.insert(v.end(),b,e);
+        while (b!=e) insert(*b++);
     }
     
-    void insert(std::initializer_list<Key> ilist) {
-        v.insert(v.end(),ilist);
+    void insert(std::initializer_list<value_type> ilist) {
+        for (const auto &x: ilist) insert(x);
     }
 
     template <typename... Args>
-    iterator emplace(Args &&... args) {
-        v.emplace_back(std::forward<Args>(args)...);
-        return std::prev(v.cend());
+    std::pair<iterator,bool> emplace(Args &&... args) {
+        value_type kv(std::forward<Args>(args)...);
+        auto where=find(kv.first);
+        if (where!=end()) return std::make_pair(where,false);
+
+        v.push_back(std::move(kv));
+        return std::make_pair(std::prev(v.end()),true);
     }
 
     iterator erase(const_iterator pos) {
@@ -106,38 +122,42 @@ public:
     }
 
     size_type erase(const key_type &key) {
-        size_t n=0;
-        auto b=v.begin();
-        while (b!=v.end()) if (eq(*b,key)) b=v.erase(b),++n; else ++b;
-        return n;
+        auto where=find(key);
+        if (where==end()) return 0;
+
+        erase(where);
+        return 1;
     }
-    
-    void swap(small_multiset &other) {
+
+    void swap(small_map &other) {
         std::swap(v,other.v);
     }
 
     size_type count(const key_type &key) {
-        size_type c=0;
-        for (const auto &k: v) c+=static_cast<bool>(eq(k,key));
-        return c;
+        return find(key)==end()?0:1;
     }
 
-    iterator find(const key_type &key) {
+private:
+    typename store_type::iterator find_in_store(const key_type &key) {
         auto b=v.begin();
         auto e=v.end();
-        while (b!=e) if (eq(*b,key)) break; else ++b;
+        while (b!=e) if (eq(b->first,key)) break; else ++b;
         return b;
-        
+    }
+
+public:
+    iterator find(const key_type &key) {
+        return find_in_store(key);
     }
 
     KeyEqual key_eq() const { return eq; }
     Allocator get_allocator() const { return v.get_allocator(); }
 
-    friend bool operator==(const small_multiset &a,const small_multiset &b) {
+    friend bool operator==(const small_map &a,const small_map &b) {
         return std::is_permutation(a.begin(),a.end(),b.begin(),a.eq);
     }
 
-    friend bool operator!=(const small_multiset &a,const small_multiset &b) {
+    friend bool operator!=(const small_map &a,const small_map &b) {
         return !(a==b);
     }
 
@@ -145,6 +165,8 @@ private:
     store_type v;
     KeyEqual eq;
 };
+
+#if 0
 
 /** Array-backed small multiset with fixed max capacity.
  *
@@ -217,7 +239,8 @@ namespace impl {
             while (b!=e) insert(*b++);
         }
         
-        void insert(std::initializer_list<Key> ilist) {
+        template <typename T>
+        void insert(std::initializer_list<T> ilist) {
             insert(ilist.begin(),ilist.end());
         }
 
@@ -274,7 +297,8 @@ public:
         insert(b,e);
     }
 
-    tiny_multiset(std::initializer_list<Key> ilist,
+    template <typename T>
+    tiny_multiset(std::initializer_list<T> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
@@ -346,7 +370,8 @@ public:
         insert(b,e);
     }
 
-    tiny_multiset(std::initializer_list<Key> ilist,
+    template <typename T>
+    tiny_multiset(std::initializer_list<T> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
@@ -403,5 +428,6 @@ public:
         std::swap(n,other.n);
     }
 };
+#endif
 
-#endif // ndef TINY_MULTISET_H
+#endif // ndef TINY_MAP_H
