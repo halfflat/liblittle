@@ -134,7 +134,7 @@ public:
     }
 
     size_type count(const key_type &key) const {
-        return find(key)==end()?0:1;
+        return find(key)!=end();
     }
 
     iterator find(const key_type &key) const {
@@ -151,7 +151,6 @@ public:
     mapped_type &operator[](Key &&key) {
         auto where=find_in_store(key);
         if (where!=v.end()) return where->second;
-        if (where!=end()) return where->second;
         v.emplace_back(std::piecewise_construct,std::forward_as_tuple(std::move(key)),std::tuple<>());
         return std::prev(v.end())->second;
     }
@@ -205,21 +204,20 @@ private:
     }
 };
 
-#if 0
-
-/** Array-backed small multiset with fixed max capacity.
+/** Array-backed small map with fixed max capacity.
  *
  * Note that capcity is not checked when inserting elements.
  */
 
 namespace impl {
-    // common functionality across tiny_multiset classes with trivial
+    // common functionality across tiny_map classes with trivial
     // and non-trivial value types.
 
-    template <typename Key,std::size_t N,class KeyEqual>
-    struct tiny_multiset_common {
+    template <typename Key,typename Value,std::size_t N,class KeyEqual>
+    struct tiny_map_common {
         typedef Key key_type;
-        typedef key_type value_type;
+        typedef std::pair<Key,Value> value_type;
+        typedef Value mapped_type;
         typedef KeyEqual key_equal;
 
         typedef const value_type &const_reference;
@@ -231,8 +229,8 @@ namespace impl {
         typedef const value_type *const_iterator;
         typedef const_iterator iterator;
 
-        tiny_multiset_common() =default;
-        tiny_multiset_common(const KeyEqual &eq_): eq(eq_) {}
+        tiny_map_common() =default;
+        tiny_map_common(const KeyEqual &eq_): eq(eq_) {}
 
         key_equal key_eq() const { return eq; }
 
@@ -246,68 +244,127 @@ namespace impl {
         size_type size() const { return n; }
         size_type max_size() const { return N; }
 
-        size_type count(const key_type &key) {
-            size_type c=0;
-            for (const auto &k: *this) c+=static_cast<bool>(eq(k,key));
-            return c;
+        size_type count(const key_type &key) const {
+            return find(key)!=end();
         }
 
-        iterator find(const key_type &key) {
-            auto b=begin();
-            auto e=end();
-            while (b!=e) if (eq(*b,key)) break; else ++b;
-            return b;
+        iterator find(const key_type &key) const {
+            return find_(key);
         }
 
         template <typename... Args>
-        iterator emplace(Args &&... args) {
-            ::new(get(n)) value_type(std::forward<Args>(args)...);
-            return begin()+(n++);
+        std::pair<iterator,bool> emplace(Args &&... args) {
+            value_type kv(std::forward<Args>(args)...);
+            auto where=find(kv.first);
+            if (where!=end()) return std::make_pair(where,false);
+
+            ::new(get(n)) value_type(std::move(kv));
+            return std::make_pair(begin()+n++,true);
         }
 
         iterator insert(const value_type &value) {
-            return emplace(std::move(value));
-        }
-        
-        iterator insert(value_type &&value) {
-            return emplace(std::move(value));
+            auto where=find_(value.first);
+            if (where==end()) {
+                ::new(get(n)) value_type(value);
+                return begin()+n++;
+            }
+            else {
+                *where=value;
+                return where;
+            }
         }
 
+        iterator insert(value_type &&value) {
+            auto where=find_(value.first);
+            if (where==end()) {
+                ::new(get(n)) value_type(std::move(value));
+                return begin()+n++;
+            }
+            else {
+                *where=value;
+                return where;
+            }
+        }
+    
         template <typename I>
         void insert(I b,I e) {
             while (b!=e) insert(*b++);
         }
         
-        template <typename T>
-        void insert(std::initializer_list<T> ilist) {
+        void insert(std::initializer_list<value_type> ilist) {
             insert(ilist.begin(),ilist.end());
         }
 
-        bool operator==(const tiny_multiset_common &b) const {
-            return std::is_permutation(begin(),end(),b.begin(),eq);
+        mapped_type &operator[](const Key &key) {
+            auto where=find_(key);
+            if (where!=end()) return where->second;
+            ::new(get(n)) value_type(std::piecewise_construct,std::forward_as_tuple(key),std::tuple<>());
+            return get(n++)->second;
         }
 
-        bool operator!=(const tiny_multiset_common &b) const {
+        mapped_type &operator[](Key &&key) {
+            auto where=find_(key);
+            if (where!=end()) return where->second;
+            ::new(get(n)) value_type(std::piecewise_construct,std::forward_as_tuple(std::move(key)),std::tuple<>());
+            return get(n++)->second;
+        }
+
+        mapped_type &at(const Key &key) {
+            auto where=find_(key);
+            if (where!=end()) return where->second;
+            throw std::out_of_range("missing key");
+        }
+
+        const mapped_type &at(const Key &key) const {
+            auto where=find_(key);
+            if (where!=end()) return where->second;
+            throw std::out_of_range("missing key");
+        }
+
+        bool operator==(const tiny_map_common &b) const {
+            if (size()!=b.size()) return false;
+    
+            auto bend=b.end();
+            for (const auto &e: *this) {
+                auto bi=b.find(e.first);
+                if (bi==bend || e.second!=bi->second) return false;
+            }
+
+            return true;
+        }
+
+        bool operator!=(const tiny_map_common &b) const {
             return !(*this==b);
         }
 
     protected:
-        typename std::aligned_storage<sizeof(Key),alignof(Key)>::type data[N];
+        typename std::aligned_storage<sizeof(value_type),alignof(value_type)>::type data[N];
         size_t n=0;
         KeyEqual eq;
 
         value_type *get(std::ptrdiff_t i=0) { return reinterpret_cast<value_type *>(data+i); }
         const value_type *get(std::ptrdiff_t i=0) const { return reinterpret_cast<const value_type *>(data+i); }
+
+        const value_type *find_(const Key &key) const {
+            for (std::ptrdiff_t i=0;i<n;++i) if (eq(get(i)->first,key)) return get(i);
+            return get(n);
+        }
+
+        value_type *find_(const Key &key) {
+            for (std::ptrdiff_t i=0;i<n;++i) if (eq(get(i)->first,key)) return get(i);
+            return get(n);
+        }
     };
 
 } // namesapce impl
 
-// tiny_multiset with trivial value type
-template <typename Key,std::size_t N,class KeyEqual=std::equal_to<Key>,bool trivial=std::is_trivially_copyable<Key>::value>
-struct tiny_multiset: public impl::tiny_multiset_common<Key,N,KeyEqual> {
+// tiny_map with trivial value type
+template <typename Key,typename Value,std::size_t N,class KeyEqual=std::equal_to<Key>,bool trivial=std::is_trivially_copyable<Key>::value>
+struct tiny_map: public impl::tiny_map_common<Key,Value,N,KeyEqual> {
 private:
-    using common=impl::tiny_multiset_common<Key,N,KeyEqual>;
+    using common=impl::tiny_map_common<Key,Value,N,KeyEqual>;
     using common::get;
+    using common::find_;
     using common::data;
     using common::n;
     using common::eq;
@@ -328,25 +385,24 @@ public:
     using common::insert;
     using common::emplace;
     
-    tiny_multiset() {}
-    explicit tiny_multiset(const KeyEqual &eq_): common(eq_) {}
+    tiny_map() {}
+    explicit tiny_map(const KeyEqual &eq_): common(eq_) {}
 
     template <typename I>
-    tiny_multiset(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
+    tiny_map(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
         insert(b,e);
     }
 
-    template <typename T>
-    tiny_multiset(std::initializer_list<T> ilist,
+    tiny_map(std::initializer_list<value_type> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
     }
 
-    tiny_multiset(const tiny_multiset &) =default;
-    tiny_multiset(tiny_multiset &&) =default;
-    tiny_multiset &operator=(const tiny_multiset &) =default;
-    tiny_multiset &operator=(tiny_multiset &&) =default;
+    tiny_map(const tiny_map &) =default;
+    tiny_map(tiny_map &&) =default;
+    tiny_map &operator=(const tiny_map &) =default;
+    tiny_map &operator=(tiny_map &&) =default;
     
     void clear() { n=0; }
 
@@ -358,29 +414,29 @@ public:
         *x=*last;
         --n;
         return pos;
-        
     }
 
     size_type erase(const key_type &key) {
-        size_t orig_n=n;
-        auto b=begin();
-        while (b!=end()) if (eq(*b,key)) b=erase(b); else ++b;
-        return orig_n-n;
+        auto where=find_(key);
+        if (where==end()) return 0;
+
+        erase(where);
+        return 1;
     }
     
-    void swap(tiny_multiset &other) {
+    void swap(tiny_map &other) {
         std::swap(data,other.data);
         std::swap(n,other.n);
     }
 };
 
-
-// tiny_multiset with trivial value type
-template <typename Key,std::size_t N,class KeyEqual>
-struct tiny_multiset<Key,N,KeyEqual,false>: public impl::tiny_multiset_common<Key,N,KeyEqual>  {
+// tiny_map with non-trivial value type
+template <typename Key,typename Value,std::size_t N,class KeyEqual>
+struct tiny_map<Key,Value,N,KeyEqual,false>: public impl::tiny_map_common<Key,Value,N,KeyEqual>  {
 private:
-    using common=impl::tiny_multiset_common<Key,N,KeyEqual>;
+    using common=impl::tiny_map_common<Key,Value,N,KeyEqual>;
     using common::get;
+    using common::find_;
     using common::data;
     using common::n;
     using common::eq;
@@ -401,37 +457,48 @@ public:
     using common::insert;
     using common::emplace;
 
-    tiny_multiset() {}
-    explicit tiny_multiset(const KeyEqual &eq_): common(eq_) {}
+    tiny_map() {}
+    explicit tiny_map(const KeyEqual &eq_): common(eq_) {}
 
     template <typename I>
-    tiny_multiset(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
+    tiny_map(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
         insert(b,e);
     }
 
-    template <typename T>
-    tiny_multiset(std::initializer_list<T> ilist,
+    tiny_map(std::initializer_list<value_type> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
     }
 
-    tiny_multiset(const tiny_multiset &other): common(other.eq) {
-        for (const auto &x: other) emplace(x);
+    tiny_map(const tiny_map &other): common(other.eq) {
+        for (const auto &x: other) ::new(get(n++)) value_type(x);
     }
 
-    tiny_multiset(tiny_multiset &&other) {
-        for (auto &x: other) emplace(std::move(x));
+    tiny_map(tiny_map &&other) {
+        for (auto &x: other) ::new(get(n++)) value_type(std::move(x));
     }
 
-    tiny_multiset &operator=(const tiny_multiset &) =default;
-    tiny_multiset &operator=(tiny_multiset &&) =default;
+    tiny_map &operator=(const tiny_map &other) {
+        if (this!=&other) {
+            clear();
+            for (const auto &x: other) ::new(get(n++)) value_type(x);
+        }
+        return *this;
+    }
 
-    ~tiny_multiset() { clear(); }
+    tiny_map &operator=(tiny_map &&other) {
+        if (this!=&other) {
+            clear();
+            for (auto &x: other) ::new(get(n++)) value_type(std::move(x));
+        }
+        return *this;
+    }
+
+    ~tiny_map() { clear(); }
 
     void clear() {
-        value_type *x=get();
-        for (size_t i=0;i<n;++i) x[i].~value_type();
+        for (size_t i=0;i<n;++i) get(i)->~value_type();
         n=0;
     }
 
@@ -446,13 +513,14 @@ public:
     }
 
     size_type erase(const key_type &key) {
-        size_t orig_n=n;
-        auto b=begin();
-        while (b!=end()) if (eq(*b,key)) b=erase(b); else ++b;
-        return orig_n-n;
+        auto where=find_(key);
+        if (where==end()) return 0;
+
+        erase(where);
+        return 1;
     }
     
-    void swap(tiny_multiset &other) {
+    void swap(tiny_map &other) {
         std::ptrdiff_t i=0;
         std::ptrdiff_t nmin=std::min(n,other.n);
         for (std::ptrdiff_t i=0;i<nmin;++i) std::swap(*get(i),*(other.get(i)));
@@ -467,6 +535,5 @@ public:
         std::swap(n,other.n);
     }
 };
-#endif
 
 #endif // ndef TINY_MAP_H

@@ -16,8 +16,7 @@ depend very much on how they are used and on the nature of the target platform.
 
 ## Contents
 
-So far, just one container type and one algorithm:
-
+So far, just two container types and one algorithm:
 
 ### `small_multiset` and `tiny_multiset`
 
@@ -36,6 +35,11 @@ implementation.
 `tiny_multiset` is a multiset with capacity fixed at compile-time, backed by
 an array of uninitialised storage. It does not perform heap allocations, and
 correspondingly does not have an allocator nor a `get_allocator()` method.
+
+### `small_map` and `tiny_map`
+
+These are the `map` analogues of `small_multiset` and `tiny_multiset`
+above, with the corresponding semantics.
 
 ### `smallsort`
 

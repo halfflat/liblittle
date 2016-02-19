@@ -312,7 +312,7 @@ public:
 };
 
 
-// tiny_multiset with trivial value type
+// tiny_multiset with non-trivial value type
 template <typename Key,std::size_t N,class KeyEqual>
 struct tiny_multiset<Key,N,KeyEqual,false>: public impl::tiny_multiset_common<Key,N,KeyEqual>  {
 private:
@@ -360,8 +360,21 @@ public:
         for (auto &x: other) emplace(std::move(x));
     }
 
-    tiny_multiset &operator=(const tiny_multiset &) =default;
-    tiny_multiset &operator=(tiny_multiset &&) =default;
+    tiny_multiset &operator=(const tiny_multiset &other) {
+        if (this!=&other) {
+            clear();
+            insert(other.begin(),other.end());
+        }
+        return *this;
+    }
+
+    tiny_multiset &operator=(tiny_multiset &&other) {
+        if (this!=&other) {
+            clear();
+            for (auto &x: other) insert(std::move(x));
+        }
+        return *this;
+    }
 
     ~tiny_multiset() { clear(); }
 

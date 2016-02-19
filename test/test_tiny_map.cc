@@ -40,8 +40,8 @@ struct int_nontrivial {
 };
 
 
-//using multiset_types=::testing::Types<tiny_multiset<int,20>,tiny_multiset<int_nontrivial,20>,small_multiset<int>>;
-using map_types=::testing::Types<small_map<int,int>,small_map<int_nontrivial,int_nontrivial>>;
+using map_types=::testing::Types<small_map<int,int>,small_map<int_nontrivial,int_nontrivial>,
+                                 tiny_map<int,int,20>,tiny_map<int_nontrivial,int_nontrivial,20>>;
 TYPED_TEST_CASE(xmap,map_types);
 
 
@@ -279,8 +279,7 @@ struct eq_mod_k {
     int k;
 };
 
-//using map_nonstd_eq_types=::testing::Types<tiny_multiset<int,20,eq_mod_k>,tiny_multiset<int_nontrivial,20,eq_mod_k>,small_multiset<int,eq_mod_k>>;
-using map_nonstd_eq_types=::testing::Types<small_map<int,int,eq_mod_k>>;
+using map_nonstd_eq_types=::testing::Types<small_map<int,int,eq_mod_k>,tiny_map<int,int,20,eq_mod_k>,tiny_map<int_nontrivial,int_nontrivial,20,eq_mod_k>>;
 TYPED_TEST_CASE(xmap_nonstd_eq,map_nonstd_eq_types);
 
 TYPED_TEST(xmap_nonstd_eq,count) {
