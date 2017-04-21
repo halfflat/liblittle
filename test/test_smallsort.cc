@@ -1,6 +1,6 @@
 #include <type_traits>
 #include <cstdint>
-#include <algorithm>
+#include <numeric>
 #include <gtest/gtest.h>
 
 #include "smallsort.h"
@@ -57,7 +57,7 @@ TYPED_TEST(smallsort,binary_sort) {
             mask<<=1;
         }
 
-        small_sort_inplace<n>(a);
+        hf::small_sort_inplace<n>(a);
         auto a0=a.begin();
         auto a_end=a.end();
         ASSERT_EQ(0,std::accumulate(a0,a0+(n-c),0));

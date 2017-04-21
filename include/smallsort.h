@@ -9,6 +9,8 @@
 #include <type_traits>
 #include <iostream>
 
+namespace hf {
+
 namespace impl {
     template <bool use_min_max=false>
     struct reorder {
@@ -22,9 +24,10 @@ namespace impl {
     struct reorder<true> {
         template <typename V>
         static void run(V &a,V &b) {
-            V l=a<b?a:b;
-            b=a<b?b:a;
-            a=l;
+            V l = std::min(a,b);
+            V u = std::max(a,b);
+            a = l;
+            b = u;
         }
     };
 
@@ -65,13 +68,12 @@ namespace impl {
             merge_subsequences<m/2,m0+k,n/2,n0+k,2*k,A>::run(a);
             // pair-wise merge sorted subsequences
             pairwise_exchange<m-1,m0+k,k,A>::run(a);
-            
+
             constexpr int d=(m+1)%2;
             if (d) S<m0+(m-1)*k,n0>::run(a);
             pairwise_exchange<n-d,n0+d*k,k,A>::run(a);
         }
     };
-    
 
     template <int m0,int n,int n0,int k,typename A>
     struct merge_subsequences<0,m0,n,n0,k,A> { static void run(A &a) {}; };
@@ -176,6 +178,8 @@ template <int n,typename A>
     impl::small_sort_inplace<n,0,A>::run(a);
     return a;
 }
+
+} // namespace hf
 
 #endif // ndef SMALLSORT_HPP
 
