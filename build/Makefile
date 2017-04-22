@@ -1,12 +1,14 @@
 .PHONY: clean all realclean test bench
 
 tests:=test_smallsort test_tiny_multiset test_tiny_map
-benches:=bench_smallsort
+benches:=bench_smallsort bench_maps
 
 top=..
 sources:=$(wildcard $(top)/test/*.cc) $(wildcard $(top)/bench/*.cc)
 
-all: $(tests) $(benches)
+# by default: build all unit tests and benchmarks
+
+all:: $(tests) $(benches)
 
 clean:
 	rm -f gtest-all.o gtest_main.o obj/*.o obj/gbench/*.o obj/gtest/*.o
@@ -14,14 +16,25 @@ clean:
 realclean: clean
 	rm -f $(tests) $(benches) libbenchmark.a libgtestmain.a obj/*.d obj/gbench/*.d obj/gtest/*.d
 
-OPTFLAGS=-Ofast -march=native
+# run all unit tests with `test` target:
 
-CXXFLAGS=-std=c++11 -g -pthread $(OPTFLAGS) -MMD -MP
+test: $(tests)
+	for test in $^; do ./$$test; done
 
-# directories
+# generate and inspect assembly for small sort implementation:
+# build smallsort-<type><count>.s
 
-GTEST_DIR=$(top)/external/gtest/googletest
-GBENCH_DIR=$(top)/external/gbench
+#smallsort-%.s: smallsort-%.cc
+#    $(CXX) $(CXXFLAGS) $(CPPFLAGS) -S -o $@ $^
+#
+#smallsort-%.cc: mk-smallsort-wrap.pl
+#    perl mk-smallsort-wrap.pl "%" > $@
+
+# compiler flags:
+# `-pthread` required for googletest; `-MMD -MP` for automatic dependency generation
+
+OPTFLAGS:=-O3 -march=native
+CXXFLAGS:=-std=c++11 -g -pthread $(OPTFLAGS) -MMD -MP
 
 vpath %.h $(top)/include
 vpath test% $(top)/test
@@ -30,6 +43,9 @@ vpath bench% $(top)/bench
 $(shell mkdir -p obj obj/gbench obj/gtest)
 
 # external libraries: gtest, gbench
+
+GTEST_DIR=$(top)/external/gtest/googletest
+GBENCH_DIR=$(top)/external/gbench
 
 # build gtest
 
@@ -57,9 +73,9 @@ obj/gbench/%.o: $(GBENCH_DIR)/src/%.cc
 libbenchmark.a: $(patsubst %.cc,obj/gbench/%.o,$(notdir $(gbench_sources)))
 	$(AR) $(ARFLAGS) $@ $^
 
-# build tests
+# liblittle unit tests
 
-TEST_CPPFLAGS:=$(GTEST_INCLUDES) -I$(top)/incluide
+TEST_CPPFLAGS:=$(GTEST_INCLUDES) -I$(top)/include
 TEST_LDLIBS:=$(LDLIBS) -L. -lgtestmain
 
 obj/test%.o: test%.cc
@@ -68,17 +84,11 @@ obj/test%.o: test%.cc
 test%: obj/test%.o libgtestmain.a
 	$(CXX) $(CXXFLAGS) $(TEST_CPPFLAGS) -o $@ $< $(LDFLAGS) $(TEST_LDLIBS)
 
-.PRECIOUS: test% bench%
-
-# run tests
-
-test: $(tests)
-	for test in $^; do ./$$test; done
-
+.PRECIOUS:: test%
 
 # build benchmark
 
-BENCH_CPPFLAGS:=$(GBENCH_INCLUDES) -I$(top)/incluide
+BENCH_CPPFLAGS:=$(GBENCH_INCLUDES) -I$(top)/include
 BENCH_LDLIBS:=$(LDLIBS) -L. -lbenchmark
 
 obj/bench%.o: bench%.cc
@@ -87,11 +97,7 @@ obj/bench%.o: bench%.cc
 bench%: obj/bench%.o libbenchmark.a
 	$(CXX) $(CXXFLAGS) $(BENCH_CPPFLAGS) -o $@ $< $(LDFLAGS) $(BENCH_LDLIBS)
 
-#
-## run benchmarks
-#bench: $(benches)
-#	./bench_smallsort
-#
+.PRECIOUS:: bench%
 
 # include automatically generated dependencies
 -include $(patsubst %.cc,obj/%.d,$(notdir $(sources)))
