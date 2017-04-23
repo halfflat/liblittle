@@ -35,6 +35,7 @@ test: $(tests)
 
 OPTFLAGS:=-O3 -march=native
 CXXFLAGS:=-std=c++11 -g -pthread $(OPTFLAGS) -MMD -MP
+CPPFLAGS:=-DHF_USE_ASM_KERNELS
 
 vpath %.h $(top)/include
 vpath test% $(top)/test

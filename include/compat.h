@@ -1,7 +1,20 @@
 // workarounds for old gcc standard libraries
 
+#include <type_traits>
+#include <string>
+#include <cstdio>
 
 #if defined(__GNUC__) && __GNUC__<5
-#define is_trivially_copyable has_trivial_copy_constructor
+namespace std {
+template <typename T>
+using is_trivially_copyable = std::has_trivial_copy_constructor<T>;
+
+std::string to_string(long long x) {
+    char buf[100];
+    snprintf(buf, sizeof(buf), "%lld", x);
+    return std::string(buf);
+}
+
+}
 #endif
 

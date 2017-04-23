@@ -3,44 +3,25 @@
 
 namespace hf {
 
-
 template <typename V>
 struct comparator {
     void operator()(V& a, V& b) const {
         if (std::is_arithmetic<typename std::decay<V>::type>::value)  {
-            auto l = a<b? a: b;
-            b = a<b? b: a;
-            a = std::move(l);
+            auto l = std::min(a,b);
+            auto u = std::max(a,b);
+            a = l;
+            b = u;
         }
         else {
+            if (!(a<b)) std::swap(a,b);
         }
     }
 };
 
-struct reorder {
-    template <typename V>
-    void operator()(V& a, V& b) const {
-        (*this)(a, b, typename std::is_arithmetic<typename std::decay<V>::type>::type{});
-    }
+} // namespace hf
 
-    protected:
-        template <typename V>
-        void operator()(V& a,V& b,std::true_type) const {
-        }
-
-        template <typename V>
-        void operator()(V& a,V& b,std::false_type) const {
-            if (!(a<b)) std::swap(a,b);
-        }
-    };
-
-    template <int m,int n,typename Reorder>
-    struct S {
-        template <typename A>
-        [[gnu::always_inline]] static void run(A &a) {
-            Reorder{}(a[m],a[n]);
-        }
-    };
-
+#ifdef HF_USE_ASM_KERNELS
+#include "comparator_asm.h"
+#endif
 
 #endif // ndef HF_COMPARATOR_H_
