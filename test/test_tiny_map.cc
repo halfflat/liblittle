@@ -1,3 +1,5 @@
+#include "compat.h"
+
 #include <utility>
 #include <cmath>
 #include <gtest/gtest.h>
