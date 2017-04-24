@@ -18,7 +18,7 @@ depend very much on how they are used and on the nature of the target platform.
 
 So far, just two container types and one algorithm:
 
-### `small_multiset` and `tiny_multiset`
+### `small::multiset` and `tiny::multiset`
 
 `small_multiset` implements the C++ UnorderedAssociativeContainer concept with
 the following omissions:
@@ -32,19 +32,18 @@ slower O(*N*) find and count operations. For sufficiently small *N*, this may
 still offer time or space advantages over a tree, hash or sorted-array
 implementation.
 
-`tiny_multiset` is a multiset with capacity fixed at compile-time, backed by
+`tiny::multiset` is a multiset with capacity fixed at compile-time, backed by
 an array of uninitialised storage. It does not perform heap allocations, and
 correspondingly does not have an allocator nor a `get_allocator()` method.
 
-### `small_map` and `tiny_map`
+### `small::map` and `tiny::map`
 
-These are the `map` analogues of `small_multiset` and `tiny_multiset`
+These are the `map` analogues of `small::multiset` and `tiny::multiset`
 above, with the corresponding semantics.
 
-### `smallsort`
+### `tiny::sort`
 
-The `smallsort` header offers two templated functions `smallsort` and
-`smallsort_inplace` that use sorting networks for sorting random-access
+The templated function `tiny::sort` uses sorting networks for sorting random-access
 collections (really, anything supporting [] indexing) of fixed size.
 
 Optimal sorting networks are used up to size 6; larger networks are constructed
@@ -55,7 +54,7 @@ min and max operations.
 Branchless comparator kernels are provided for x86_64 architecures, which are
 compiled in if the `HF_USE_ASM_KERNELS` preprocessor symbol is defined.
 
-Produced assembly can be examined on the fly with the `smallsort-asm-%`
+Produced assembly can be examined on the fly with the `tinysort-asm-%`
 targets, where `%` is a label of the form _&lt;type&gt;&lt;size&gt;_, e.g. `int4`.
 Spaces in the specification can and should be substituted with dashes `-`, e.g.
 `unsigned-int*-3`.
