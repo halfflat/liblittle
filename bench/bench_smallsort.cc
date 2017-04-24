@@ -149,7 +149,7 @@ struct register_benches<V, intlist<sizes...>> {
 };
 
 int main(int argc,char** argv) {
-    using sizes = intlist<3,4,5,6,7,8,9,10,11,12,13,14,15,45,135>;
+    using sizes = intlist<3,4,5,6,7,8,9,10,11,12,13,14,15,20,25,30,35,40,45>;
     foreach_type<short, unsigned short, int, unsigned, float, double>::run<register_benches, sizes>();
 
     benchmark::Initialize(&argc, argv);

@@ -7,8 +7,8 @@ template <typename V>
 struct comparator {
     void operator()(V& a, V& b) const {
         if (std::is_arithmetic<typename std::decay<V>::type>::value)  {
-            auto l = std::min(a,b);
-            auto u = std::max(a,b);
+            auto l = a<b? a: b;
+            auto u = a<b? b: a;
             a = l;
             b = u;
         }

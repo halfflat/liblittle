@@ -1,10 +1,11 @@
 // workarounds for old gcc standard libraries
 
+#if defined(COMPAT_LIBSTDCPP4) 
+
 #include <type_traits>
 #include <string>
 #include <cstdio>
 
-#if defined(__GNUC__) && __GNUC__<5
 namespace std {
 template <typename T>
 using is_trivially_copyable = std::has_trivial_copy_constructor<T>;

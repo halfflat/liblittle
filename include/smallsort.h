@@ -5,9 +5,7 @@
 /// random-access sequences.
 
 #include <utility>
-#include <algorithm>
 #include <type_traits>
-#include <iostream>
 
 #include "comparator.h"
 
@@ -165,12 +163,12 @@ namespace impl {
 } // namespace impl
 
 template <int n,typename A,typename Comparator=::hf::comparator<impl::value_type_t<A>>>
-[[gnu::always_inline]] void smallsort_inplace(A &a, Comparator&& comparator = Comparator{}) {
+[[gnu::always_inline]] inline void smallsort_inplace(A &a, Comparator&& comparator = Comparator{}) {
     impl::smallsort_inplace<n,0>::run(a, comparator);
 }
 
 template <int n,typename A,typename Comparator=::hf::comparator<impl::value_type_t<A>>>
-[[gnu::always_inline]] A smallsort(A a, Comparator&& comparator = Comparator{}) {
+[[gnu::always_inline]] inline A smallsort(A a, Comparator&& comparator = Comparator{}) {
     impl::smallsort_inplace<n,0>::run(a, comparator);
     return a;
 }
