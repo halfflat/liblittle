@@ -26,8 +26,8 @@ $key=~s/\&/ref/g;
 $key=~s/[:\s]/_/g;
 
 print << "__end";
-#include "smallsort.h"
+#include "little/sort.h"
 void smallsort_${key}(${type}* a) {
-    hf::smallsort_inplace<$n>(a);
+    hf::tiny::sort<$n>(a);
 }
 __end

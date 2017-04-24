@@ -1,10 +1,12 @@
-#include "compat.h"
+#include "little/compat.h"
 
 #include <utility>
 #include <cmath>
 #include <gtest/gtest.h>
 
-#include "tiny_map.h"
+#include "little/map.h"
+
+using namespace hf;
 
 template <typename T>
 class xmap: public ::testing::Test {
@@ -12,7 +14,7 @@ public:
     typedef typename T::value_type value_type;
 };
 
-// use this to check for correct ctor, dtor behaviour in tiny_map
+// use this to check for correct ctor, dtor behaviour in small/tiny maps
 
 int g_dtor_count=0;
 int g_ctor_count=0;
@@ -37,8 +39,8 @@ struct int_nontrivial {
 };
 
 
-using map_types=::testing::Types<small_map<int,int>,small_map<int_nontrivial,int_nontrivial>,
-                                 tiny_map<int,int,20>,tiny_map<int_nontrivial,int_nontrivial,20>>;
+using map_types=::testing::Types<small::map<int,int>,small::map<int_nontrivial,int_nontrivial>,
+                                 tiny::map<int,int,20>,tiny::map<int_nontrivial,int_nontrivial,20>>;
 TYPED_TEST_CASE(xmap,map_types);
 
 
@@ -50,7 +52,6 @@ TYPED_TEST(xmap,ctor) {
 
     {
         map m_ilist({{1,1},{3,2},{4,1},{3,7}});
-
         ASSERT_EQ(3,m_ilist.size());
     }
 
@@ -59,15 +60,12 @@ TYPED_TEST(xmap,ctor) {
     {
         std::vector<value_type> ns={{1,1},{3,2},{4,1},{3,7}};
         map m_ipair(ns.begin(),ns.end());
-
         ASSERT_EQ(3,m_ipair.size());
 
         map m_copy(m_ipair);
-        
         ASSERT_EQ(m_ipair.size(),m_copy.size());
 
         map m_move(std::move(m_ipair));
-        
         ASSERT_EQ(m_copy.size(),m_move.size());
     }
 
@@ -99,7 +97,7 @@ TYPED_TEST(xmap,clear) {
 
 TYPED_TEST(xmap,equality) {
     using map=TypeParam;
-    
+
     map m1({{1,1},{3,2},{4,1},{3,7}});
     map m2({{3,7},{1,1},{4,1}});
     map m3({{3,7},{1,1},{4,1},{1,2}});
@@ -276,7 +274,7 @@ struct eq_mod_k {
     int k;
 };
 
-using map_nonstd_eq_types=::testing::Types<small_map<int,int,eq_mod_k>,tiny_map<int,int,20,eq_mod_k>,tiny_map<int_nontrivial,int_nontrivial,20,eq_mod_k>>;
+using map_nonstd_eq_types=::testing::Types<small::map<int,int,eq_mod_k>,tiny::map<int,int,20,eq_mod_k>,tiny::map<int_nontrivial,int_nontrivial,20,eq_mod_k>>;
 TYPED_TEST_CASE(xmap_nonstd_eq,map_nonstd_eq_types);
 
 TYPED_TEST(xmap_nonstd_eq,count) {
@@ -287,7 +285,7 @@ TYPED_TEST(xmap_nonstd_eq,count) {
     ASSERT_EQ(2,m1.size());
     ASSERT_EQ(4,m1.at(3));
     ASSERT_EQ(4,m1.at(1));
-    
+
     // test with stateful eq_mod_k, k==3
     map m2({{1,2},{2,3},{3,4},{4,5}},eq_mod_k(3));
     ASSERT_EQ(3,m2.size());

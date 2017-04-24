@@ -15,10 +15,14 @@
  * 4. No get_allocator() method for tiny_map.
  */
 
+
+namespace hf {
+
 /** Vector-backed small map */
 
+namespace small {
 template <typename Key,typename Value,class KeyEqual=std::equal_to<Key>,class Allocator=std::allocator<std::pair<Key,Value>>>
-struct small_map {
+struct map {
     typedef Key key_type;
     typedef Value mapped_type;
     typedef std::pair<key_type,mapped_type> value_type;
@@ -38,29 +42,29 @@ public:
     typedef typename store_type::const_iterator const_iterator;
     typedef const_iterator iterator;
 
-    small_map(const small_map &) =default;
-    small_map(small_map &&) =default;
+    map(const map &) =default;
+    map(map &&) =default;
 
-    explicit small_map(const KeyEqual &eq_=KeyEqual(),
+    explicit map(const KeyEqual &eq_=KeyEqual(),
         const Allocator &alloc_=Allocator()): eq(eq_),v(alloc_) {}
 
-    explicit small_map(const Allocator &alloc_): v(alloc_) {}
+    explicit map(const Allocator &alloc_): v(alloc_) {}
 
-    small_map(const small_map &other,const Allocator &alloc_)
+    map(const map &other,const Allocator &alloc_)
         : v(other.v,alloc_) {}
-    small_map(small_map &&other,const Allocator &alloc_)
+    map(map &&other,const Allocator &alloc_)
         : v(std::move(other.v),alloc_) {}
 
     template <typename I>
-    small_map(I b,I e,const KeyEqual &eq_=KeyEqual(),
+    map(I b,I e,const KeyEqual &eq_=KeyEqual(),
         const Allocator &alloc_=Allocator()): eq(eq_),v(alloc_) { insert(b,e); }
 
-    small_map(std::initializer_list<value_type> ilist,
+    map(std::initializer_list<value_type> ilist,
         const KeyEqual &eq_=KeyEqual(),const Allocator &alloc_=Allocator())
         : eq(eq_),v(alloc_) { insert(ilist); }
 
-    small_map &operator=(const small_map &) =default;
-    small_map &operator=(small_map &&) =default;
+    map &operator=(const map &) =default;
+    map &operator=(map &&) =default;
 
     const_iterator begin() const { return cbegin(); }
     const_iterator cbegin() const { return v.cbegin(); }
@@ -129,7 +133,7 @@ public:
         return 1;
     }
 
-    void swap(small_map &other) {
+    void swap(map &other) {
         std::swap(v,other.v);
     }
 
@@ -170,7 +174,7 @@ public:
     KeyEqual key_eq() const { return eq; }
     Allocator get_allocator() const { return v.get_allocator(); }
 
-    friend bool operator==(const small_map &a,const small_map &b) {
+    friend bool operator==(const map &a,const map &b) {
         if (a.size()!=b.size()) return false;
         auto bend=b.end();
         for (const auto &e: a) {
@@ -181,7 +185,7 @@ public:
         return true;
     }
 
-    friend bool operator!=(const small_map &a,const small_map &b) {
+    friend bool operator!=(const map &a,const map &b) {
         return !(a==b);
     }
 
@@ -204,10 +208,14 @@ private:
     }
 };
 
+} // namespace small
+
 /** Array-backed small map with fixed max capacity.
  *
  * Note that capcity is not checked when inserting elements.
  */
+
+namespace tiny {
 
 namespace impl {
     // common functionality across tiny_map classes with trivial
@@ -285,12 +293,12 @@ namespace impl {
                 return where;
             }
         }
-    
+
         template <typename I>
         void insert(I b,I e) {
             while (b!=e) insert(*b++);
         }
-        
+
         void insert(std::initializer_list<value_type> ilist) {
             insert(ilist.begin(),ilist.end());
         }
@@ -323,7 +331,7 @@ namespace impl {
 
         bool operator==(const tiny_map_common &b) const {
             if (size()!=b.size()) return false;
-    
+
             auto bend=b.end();
             for (const auto &e: *this) {
                 auto bi=b.find(e.first);
@@ -360,7 +368,7 @@ namespace impl {
 
 // tiny_map with trivial value type
 template <typename Key,typename Value,std::size_t N,class KeyEqual=std::equal_to<Key>,bool trivial=std::is_trivially_copyable<Key>::value>
-struct tiny_map: public impl::tiny_map_common<Key,Value,N,KeyEqual> {
+struct map: public impl::tiny_map_common<Key,Value,N,KeyEqual> {
 private:
     using common=impl::tiny_map_common<Key,Value,N,KeyEqual>;
     using common::get;
@@ -384,26 +392,26 @@ public:
     using common::end;
     using common::insert;
     using common::emplace;
-    
-    tiny_map() {}
-    explicit tiny_map(const KeyEqual &eq_): common(eq_) {}
+
+    map() {}
+    explicit map(const KeyEqual &eq_): common(eq_) {}
 
     template <typename I>
-    tiny_map(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
+    map(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
         insert(b,e);
     }
 
-    tiny_map(std::initializer_list<value_type> ilist,
+    map(std::initializer_list<value_type> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
     }
 
-    tiny_map(const tiny_map &) =default;
-    tiny_map(tiny_map &&) =default;
-    tiny_map &operator=(const tiny_map &) =default;
-    tiny_map &operator=(tiny_map &&) =default;
-    
+    map(const map &) =default;
+    map(map &&) =default;
+    map &operator=(const map &) =default;
+    map &operator=(map &&) =default;
+
     void clear() { n=0; }
 
     iterator erase(const_iterator pos) {
@@ -423,16 +431,16 @@ public:
         erase(where);
         return 1;
     }
-    
-    void swap(tiny_map &other) {
+
+    void swap(map &other) {
         std::swap(data,other.data);
         std::swap(n,other.n);
     }
 };
 
-// tiny_map with non-trivial value type
+// map with non-trivial value type
 template <typename Key,typename Value,std::size_t N,class KeyEqual>
-struct tiny_map<Key,Value,N,KeyEqual,false>: public impl::tiny_map_common<Key,Value,N,KeyEqual>  {
+struct map<Key,Value,N,KeyEqual,false>: public impl::tiny_map_common<Key,Value,N,KeyEqual>  {
 private:
     using common=impl::tiny_map_common<Key,Value,N,KeyEqual>;
     using common::get;
@@ -457,29 +465,29 @@ public:
     using common::insert;
     using common::emplace;
 
-    tiny_map() {}
-    explicit tiny_map(const KeyEqual &eq_): common(eq_) {}
+    map() {}
+    explicit map(const KeyEqual &eq_): common(eq_) {}
 
     template <typename I>
-    tiny_map(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
+    map(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
         insert(b,e);
     }
 
-    tiny_map(std::initializer_list<value_type> ilist,
+    map(std::initializer_list<value_type> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
     }
 
-    tiny_map(const tiny_map &other): common(other.eq) {
+    map(const map &other): common(other.eq) {
         for (const auto &x: other) ::new(get(n++)) value_type(x);
     }
 
-    tiny_map(tiny_map &&other) {
+    map(map &&other) {
         for (auto &x: other) ::new(get(n++)) value_type(std::move(x));
     }
 
-    tiny_map &operator=(const tiny_map &other) {
+    map &operator=(const map &other) {
         if (this!=&other) {
             clear();
             for (const auto &x: other) ::new(get(n++)) value_type(x);
@@ -487,7 +495,7 @@ public:
         return *this;
     }
 
-    tiny_map &operator=(tiny_map &&other) {
+    map &operator=(map &&other) {
         if (this!=&other) {
             clear();
             for (auto &x: other) ::new(get(n++)) value_type(std::move(x));
@@ -495,7 +503,7 @@ public:
         return *this;
     }
 
-    ~tiny_map() { clear(); }
+    ~map() { clear(); }
 
     void clear() {
         for (size_t i=0;i<n;++i) get(i)->~value_type();
@@ -519,8 +527,8 @@ public:
         erase(where);
         return 1;
     }
-    
-    void swap(tiny_map &other) {
+
+    void swap(map &other) {
         std::ptrdiff_t i=0;
         std::ptrdiff_t nmin=std::min(n,other.n);
         for (std::ptrdiff_t i=0;i<nmin;++i) std::swap(*get(i),*(other.get(i)));
@@ -535,5 +543,8 @@ public:
         std::swap(n,other.n);
     }
 };
+
+} // namespace tiny
+} // namespace hf
 
 #endif // ndef TINY_MAP_H

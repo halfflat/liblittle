@@ -18,10 +18,14 @@
  * 4. No get_allocator() method for tiny_multiset.
  */
 
+namespace hf {
+
+namespace small {
+
 /** Vector-backed small multiset */
 
 template <typename Key,class KeyEqual=std::equal_to<Key>,class Allocator=std::allocator<Key>>
-struct small_multiset {
+struct multiset {
     typedef Key key_type;
     typedef key_type value_type;
     typedef KeyEqual key_equal;
@@ -40,36 +44,36 @@ public:
     typedef typename store_type::const_iterator const_iterator;
     typedef const_iterator iterator;
 
-    small_multiset(const small_multiset &) =default;
-    small_multiset(small_multiset &&) =default;
+    multiset(const multiset &) =default;
+    multiset(multiset &&) =default;
 
-    small_multiset(const KeyEqual &eq_=KeyEqual(),
+    multiset(const KeyEqual &eq_=KeyEqual(),
         const Allocator &alloc_=Allocator()): eq(eq_),v(alloc_) {}
 
-    small_multiset(const Allocator &alloc_): v(alloc_) {}
+    multiset(const Allocator &alloc_): v(alloc_) {}
 
-    small_multiset(const small_multiset &other,const Allocator &alloc_)
+    multiset(const multiset &other,const Allocator &alloc_)
         : v(other.v,alloc_) {}
-    small_multiset(small_multiset &&other,const Allocator &alloc_)
+    multiset(multiset &&other,const Allocator &alloc_)
         : v(std::move(other.v),alloc_) {}
 
     template <typename I>
-    small_multiset(I b,I e,const KeyEqual &eq_=KeyEqual(),
+    multiset(I b,I e,const KeyEqual &eq_=KeyEqual(),
         const Allocator &alloc_=Allocator()): eq(eq_),v(b,e,alloc_) {}
 
-    small_multiset(std::initializer_list<Key> ilist,
+    multiset(std::initializer_list<Key> ilist,
         const KeyEqual &eq_=KeyEqual(),const Allocator &alloc_=Allocator())
         : eq(eq_),v(ilist,alloc_) {}
 
-    small_multiset &operator=(const small_multiset &) =default;
-    small_multiset &operator=(small_multiset &&) =default;
+    multiset &operator=(const multiset &) =default;
+    multiset &operator=(multiset &&) =default;
 
     const_iterator begin() const { return cbegin(); }
     const_iterator cbegin() const { return v.cbegin(); }
 
     const_iterator end() const { return cend(); }
     const_iterator cend() const { return v.cend(); }
-    
+
     bool empty() const { return v.empty(); }
     size_type size() const { return v.size(); }
     size_type max_size() const { return v.max_size(); }
@@ -80,7 +84,7 @@ public:
         v.push_back(value);
         return std::prev(v.cend());
     }
-    
+
     iterator insert(value_type &&value) {
         v.push_back(std::move(value));
         return std::prev(v.cend());
@@ -90,7 +94,7 @@ public:
     void insert(I b,I e) {
         v.insert(v.end(),b,e);
     }
-    
+
     void insert(std::initializer_list<Key> ilist) {
         v.insert(v.end(),ilist);
     }
@@ -111,8 +115,8 @@ public:
         while (b!=v.end()) if (eq(*b,key)) b=v.erase(b),++n; else ++b;
         return n;
     }
-    
-    void swap(small_multiset &other) {
+
+    void swap(multiset &other) {
         std::swap(v,other.v);
     }
 
@@ -127,17 +131,16 @@ public:
         auto e=v.end();
         while (b!=e) if (eq(*b,key)) break; else ++b;
         return b;
-        
     }
 
     KeyEqual key_eq() const { return eq; }
     Allocator get_allocator() const { return v.get_allocator(); }
 
-    friend bool operator==(const small_multiset &a,const small_multiset &b) {
+    friend bool operator==(const multiset &a,const multiset &b) {
         return std::is_permutation(a.begin(),a.end(),b.begin(),a.eq);
     }
 
-    friend bool operator!=(const small_multiset &a,const small_multiset &b) {
+    friend bool operator!=(const multiset &a,const multiset &b) {
         return !(a==b);
     }
 
@@ -145,6 +148,10 @@ private:
     store_type v;
     KeyEqual eq;
 };
+
+} // namespace small
+
+namespace tiny {
 
 /** Array-backed small multiset with fixed max capacity.
  *
@@ -207,7 +214,7 @@ namespace impl {
         iterator insert(const value_type &value) {
             return emplace(std::move(value));
         }
-        
+
         iterator insert(value_type &&value) {
             return emplace(std::move(value));
         }
@@ -216,7 +223,7 @@ namespace impl {
         void insert(I b,I e) {
             while (b!=e) insert(*b++);
         }
-        
+
         void insert(std::initializer_list<Key> ilist) {
             insert(ilist.begin(),ilist.end());
         }
@@ -240,9 +247,9 @@ namespace impl {
 
 } // namesapce impl
 
-// tiny_multiset with trivial value type
+// tiny multiset with trivial value type
 template <typename Key,std::size_t N,class KeyEqual=std::equal_to<Key>,bool trivial=std::is_trivially_copyable<Key>::value>
-struct tiny_multiset: public impl::tiny_multiset_common<Key,N,KeyEqual> {
+struct multiset: public impl::tiny_multiset_common<Key,N,KeyEqual> {
 private:
     using common=impl::tiny_multiset_common<Key,N,KeyEqual>;
     using common::get;
@@ -265,25 +272,25 @@ public:
     using common::end;
     using common::insert;
     using common::emplace;
-    
-    tiny_multiset() {}
-    explicit tiny_multiset(const KeyEqual &eq_): common(eq_) {}
+
+    multiset() {}
+    explicit multiset(const KeyEqual &eq_): common(eq_) {}
 
     template <typename I>
-    tiny_multiset(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
+    multiset(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
         insert(b,e);
     }
 
-    tiny_multiset(std::initializer_list<Key> ilist,
+    multiset(std::initializer_list<Key> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
     }
 
-    tiny_multiset(const tiny_multiset &) =default;
-    tiny_multiset(tiny_multiset &&) =default;
-    tiny_multiset &operator=(const tiny_multiset &) =default;
-    tiny_multiset &operator=(tiny_multiset &&) =default;
+    multiset(const multiset &) =default;
+    multiset(multiset &&) =default;
+    multiset &operator=(const multiset &) =default;
+    multiset &operator=(multiset &&) =default;
     
     void clear() { n=0; }
 
@@ -305,16 +312,16 @@ public:
         return orig_n-n;
     }
     
-    void swap(tiny_multiset &other) {
+    void swap(multiset &other) {
         std::swap(data,other.data);
         std::swap(n,other.n);
     }
 };
 
 
-// tiny_multiset with non-trivial value type
+// multiset with non-trivial value type
 template <typename Key,std::size_t N,class KeyEqual>
-struct tiny_multiset<Key,N,KeyEqual,false>: public impl::tiny_multiset_common<Key,N,KeyEqual>  {
+struct multiset<Key,N,KeyEqual,false>: public impl::tiny_multiset_common<Key,N,KeyEqual>  {
 private:
     using common=impl::tiny_multiset_common<Key,N,KeyEqual>;
     using common::get;
@@ -338,29 +345,29 @@ public:
     using common::insert;
     using common::emplace;
 
-    tiny_multiset() {}
-    explicit tiny_multiset(const KeyEqual &eq_): common(eq_) {}
+    multiset() {}
+    explicit multiset(const KeyEqual &eq_): common(eq_) {}
 
     template <typename I>
-    tiny_multiset(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
+    multiset(I b,I e,const KeyEqual &eq_=KeyEqual()): common(eq_) {
         insert(b,e);
     }
 
-    tiny_multiset(std::initializer_list<Key> ilist,
+    multiset(std::initializer_list<Key> ilist,
         const KeyEqual &eq_=KeyEqual()) : common(eq_)
     {
         insert(ilist);
     }
 
-    tiny_multiset(const tiny_multiset &other): common(other.eq) {
+    multiset(const multiset &other): common(other.eq) {
         for (const auto &x: other) emplace(x);
     }
 
-    tiny_multiset(tiny_multiset &&other) {
+    multiset(multiset &&other) {
         for (auto &x: other) emplace(std::move(x));
     }
 
-    tiny_multiset &operator=(const tiny_multiset &other) {
+    multiset &operator=(const multiset &other) {
         if (this!=&other) {
             clear();
             insert(other.begin(),other.end());
@@ -368,7 +375,7 @@ public:
         return *this;
     }
 
-    tiny_multiset &operator=(tiny_multiset &&other) {
+    multiset &operator=(multiset &&other) {
         if (this!=&other) {
             clear();
             for (auto &x: other) insert(std::move(x));
@@ -376,7 +383,7 @@ public:
         return *this;
     }
 
-    ~tiny_multiset() { clear(); }
+    ~multiset() { clear(); }
 
     void clear() {
         value_type *x=get();
@@ -400,8 +407,8 @@ public:
         while (b!=end()) if (eq(*b,key)) b=erase(b); else ++b;
         return orig_n-n;
     }
-    
-    void swap(tiny_multiset &other) {
+
+    void swap(multiset &other) {
         std::ptrdiff_t i=0;
         std::ptrdiff_t nmin=std::min(n,other.n);
         for (std::ptrdiff_t i=0;i<nmin;++i) std::swap(*get(i),*(other.get(i)));
@@ -416,5 +423,8 @@ public:
         std::swap(n,other.n);
     }
 };
+
+} // namespace tiny
+} // namespace hf
 
 #endif // ndef TINY_MULTISET_H

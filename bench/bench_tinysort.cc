@@ -1,4 +1,4 @@
-#include "compat.h"
+#include "little/compat.h"
 
 #include <algorithm>
 #include <cstring>
@@ -7,7 +7,7 @@
 #include <type_traits>
 
 #include "benchmark/benchmark.h"
-#include "smallsort.h"
+#include "little/sort.h"
 
 template <typename T, typename G>
 inline T random_val(G& gen) {
@@ -31,11 +31,11 @@ struct run_stdsort {
 };
 
 template <typename T, unsigned N>
-struct run_smallsort {
+struct run_tinysort {
     using value_type = T;
     static constexpr unsigned width = N;
     void operator()(T* v) {
-        hf::smallsort_inplace<N>(v);
+        hf::tiny::sort<N>(v);
     }
 };
 
@@ -75,7 +75,7 @@ void bench(benchmark::State& state) {
 
     auto value_ptr = values;
     for (unsigned i=0; i<reps; ++i) {
-        if (!std::is_sorted(value_ptr, value_ptr+N)) throw std::runtime_error("small sort didn't sort");
+        if (!std::is_sorted(value_ptr, value_ptr+N)) throw std::runtime_error("tiny sort didn't sort");
         value_ptr += N;
     }
 }
@@ -114,18 +114,21 @@ struct foreach_type<H, Tail...> {
 
 // Benchmark registration...
 
+std::string type_name(char) { return "char"; }
 std::string type_name(short) { return "short"; }
 std::string type_name(unsigned short) { return "ushort"; }
 std::string type_name(int) { return "int"; }
 std::string type_name(unsigned) { return "uint"; }
+std::string type_name(long long) { return "longlong"; }
+std::string type_name(unsigned long long) { return "ulonglong"; }
 std::string type_name(float) { return "float"; }
 std::string type_name(double) { return "double"; }
 
 template <int n, typename V>
-struct register_smallsort_bench {
-    register_smallsort_bench() {
-        auto name = "smallsort/"+type_name(V{})+"/"+std::to_string(n);
-        benchmark::RegisterBenchmark(name.c_str(), bench<run_smallsort<V, n>>);
+struct register_tinysort_bench {
+    register_tinysort_bench() {
+        auto name = "tinysort/"+type_name(V{})+"/"+std::to_string(n);
+        benchmark::RegisterBenchmark(name.c_str(), bench<run_tinysort<V, n>>);
     }
 };
 
@@ -143,14 +146,14 @@ template <typename, typename> struct register_benches;
 template <typename V, int... sizes>
 struct register_benches<V, intlist<sizes...>> {
     register_benches() {
-        foreach_value<int, sizes...>::template run<register_smallsort_bench, V>();
+        foreach_value<int, sizes...>::template run<register_tinysort_bench, V>();
         foreach_value<int, sizes...>::template run<register_stdsort_bench, V>();
     }
 };
 
 int main(int argc,char** argv) {
     using sizes = intlist<3,4,5,6,7,8,9,10,11,12,13,14,15,20,25,30,35,40,45>;
-    foreach_type<short, unsigned short, int, unsigned, float, double>::run<register_benches, sizes>();
+    foreach_type<char, short, unsigned, long long, float, double>::run<register_benches, sizes>();
 
     benchmark::Initialize(&argc, argv);
     benchmark::RunSpecifiedBenchmarks();

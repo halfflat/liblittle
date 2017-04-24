@@ -10,6 +10,7 @@
 #include "comparator.h"
 
 namespace hf {
+namespace tiny {
 
 namespace impl {
     template <int m,int n>
@@ -73,36 +74,36 @@ namespace impl {
     // minimal networks up to 6, then recusive merge
 
     template <int n,int n0>
-    struct smallsort_inplace {
+    struct sort {
         template <typename A,typename C>
         [[gnu::always_inline]] static void run(A &a,C&& c) {
             constexpr int r=n/2;
-            smallsort_inplace<r,n0>::run(a,c);
-            smallsort_inplace<n-r,n0+r>::run(a,c);
+            sort<r,n0>::run(a,c);
+            sort<n-r,n0+r>::run(a,c);
             merge_subsequences<r,n0,n-r,n0+r,1>::run(a,c);
         }
     };
 
     template <int n0>
-    struct smallsort_inplace<0,n0> {
+    struct sort<0,n0> {
         template <typename A,typename C>
         static void run(A &a,C&& c) {}
     };
 
     template <int n0>
-    struct smallsort_inplace<1,n0> {
+    struct sort<1,n0> {
         template <typename A,typename C>
         static void run(A &a,C&& c) {}
     };
 
     template <int n0>
-    struct smallsort_inplace<2,n0> {
+    struct sort<2,n0> {
         template <typename A,typename C>
         [[gnu::always_inline]] static void run(A &a,C&& c) { S<n0,n0+1>::run(a,c); }
     };
 
     template <int n0>
-    struct smallsort_inplace<3,n0> {
+    struct sort<3,n0> {
         template <typename A,typename C>
         [[gnu::always_inline]] static void run(A &a,C&& c) {
             S<n0  ,n0+1>::run(a,c);
@@ -112,7 +113,7 @@ namespace impl {
     };
 
     template <int n0>
-    struct smallsort_inplace<4,n0> {
+    struct sort<4,n0> {
         template <typename A,typename C>
         [[gnu::always_inline]] static void run(A &a,C&& c) {
             S<n0  ,n0+1>::run(a,c);
@@ -124,7 +125,7 @@ namespace impl {
     };
 
     template <int n0>
-    struct smallsort_inplace<5,n0> {
+    struct sort<5,n0> {
         template <typename A,typename C>
         [[gnu::always_inline]] static void run(A &a,C&& c) {
             S<n0  ,n0+1>::run(a,c);
@@ -140,7 +141,7 @@ namespace impl {
     };
 
     template <int n0>
-    struct smallsort_inplace<6,n0> {
+    struct sort<6,n0> {
         template <typename A,typename C>
         [[gnu::always_inline]] static void run(A &a,C&& c) {
             S<n0  ,n0+1>::run(a,c);
@@ -163,16 +164,11 @@ namespace impl {
 } // namespace impl
 
 template <int n,typename A,typename Comparator=::hf::comparator<impl::value_type_t<A>>>
-[[gnu::always_inline]] inline void smallsort_inplace(A &a, Comparator&& comparator = Comparator{}) {
-    impl::smallsort_inplace<n,0>::run(a, comparator);
+[[gnu::always_inline]] inline void sort(A &a, Comparator&& comparator = Comparator{}) {
+    impl::sort<n,0>::run(a, comparator);
 }
 
-template <int n,typename A,typename Comparator=::hf::comparator<impl::value_type_t<A>>>
-[[gnu::always_inline]] inline A smallsort(A a, Comparator&& comparator = Comparator{}) {
-    impl::smallsort_inplace<n,0>::run(a, comparator);
-    return a;
-}
-
+} // namespace tiny
 } // namespace hf
 
 #endif // ndef HF_SMALLSORT_H_

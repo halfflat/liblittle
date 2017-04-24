@@ -60,52 +60,97 @@ namespace impl {
 }
 
 template <>
-struct comparator<std::uint16_t> {
-    void operator()(std::uint16_t& a, std::uint16_t& b) const {
+struct comparator<unsigned char> {
+    void operator()(unsigned char& a, unsigned char& b) const {
+        unsigned short as = a;
+        unsigned short bs = b;
+        impl::unsigned_comparator(as, bs);
+        a = as;
+        b = bs;
+    }
+};
+
+template <>
+struct comparator<unsigned short> {
+    void operator()(unsigned short& a, unsigned short& b) const {
         impl::unsigned_comparator(a, b);
     }
 };
 
 template <>
-struct comparator<std::uint32_t> {
-    void operator()(std::uint32_t& a, std::uint32_t& b) const {
+struct comparator<unsigned> {
+    void operator()(unsigned& a, unsigned& b) const {
         impl::unsigned_comparator(a, b);
     }
 };
 
 template <>
-struct comparator<std::uint64_t> {
-    void operator()(std::uint64_t& a, std::uint64_t& b) const {
+struct comparator<unsigned long> {
+    void operator()(unsigned long& a, unsigned long& b) const {
         impl::unsigned_comparator(a, b);
     }
 };
 
 template <>
-struct comparator<std::int16_t> {
-    void operator()(std::int16_t& a, std::int16_t& b) const {
+struct comparator<unsigned long long> {
+    void operator()(unsigned long long& a, unsigned long long& b) const {
+        impl::unsigned_comparator(a, b);
+    }
+};
+
+template <>
+struct comparator<signed char> {
+    void operator()(signed char& a, signed char& b) const {
+        short as = a;
+        short bs = b;
+        impl::signed_comparator(as, bs);
+        a = as;
+        b = bs;
+    }
+};
+
+template <>
+struct comparator<short> {
+    void operator()(short& a, short& b) const {
         impl::signed_comparator(a, b);
     }
 };
 
 template <>
-struct comparator<std::int32_t> {
-    void operator()(std::int32_t& a, std::int32_t& b) const {
+struct comparator<int> {
+    void operator()(int& a, int& b) const {
         impl::signed_comparator(a, b);
     }
 };
 
 template <>
-struct comparator<std::int64_t> {
-    void operator()(std::int64_t& a, std::int64_t& b) const {
+struct comparator<long> {
+    void operator()(long& a, long& b) const {
         impl::signed_comparator(a, b);
     }
 };
 
-static_assert(std::is_same<std::uintptr_t, std::uint64_t>::value, "unexpected intptr size");
+template <>
+struct comparator<long long> {
+    void operator()(long long& a, long long& b) const {
+        impl::signed_comparator(a, b);
+    }
+};
+
 template <typename T>
 struct comparator<T*> {
     void operator()(T*& a, T*& b) const {
         impl::unsigned_comparator(a, b);
+    }
+};
+
+template <>
+struct comparator<char> {
+    void operator()(char& a, char& b) {
+        if (std::is_signed<char>::value)
+            comparator<signed char>{}(reinterpret_cast<signed char&>(a), reinterpret_cast<signed char&>(b));
+        else
+            comparator<unsigned char>{}(reinterpret_cast<unsigned char&>(a), reinterpret_cast<unsigned char&>(b));
     }
 };
 

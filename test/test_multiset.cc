@@ -1,10 +1,12 @@
-#include "compat.h"
+#include "little/compat.h"
 
 #include <utility>
 #include <cmath>
 #include <gtest/gtest.h>
 
-#include "tiny_multiset.h"
+#include "little/multiset.h"
+
+using namespace hf;
 
 template <typename T>
 class xmultiset: public ::testing::Test {
@@ -12,7 +14,7 @@ public:
     typedef typename T::value_type value_type;
 };
 
-// use this to check for correct ctor, dtor behaviour in tiny_multisets
+// use this to check for correct ctor, dtor behaviour in tiny/small multisets
 
 int g_dtor_count=0;
 int g_ctor_count=0;
@@ -35,7 +37,7 @@ struct int_nontrivial {
     int n;
 };
 
-using multiset_types=::testing::Types<tiny_multiset<int,20>,tiny_multiset<int_nontrivial,20>,small_multiset<int>>;
+using multiset_types=::testing::Types<tiny::multiset<int,20>,tiny::multiset<int_nontrivial,20>,small::multiset<int>>;
 TYPED_TEST_CASE(xmultiset,multiset_types);
 
 
@@ -47,7 +49,6 @@ TYPED_TEST(xmultiset,ctor) {
 
     {
         mset m_ilist({1,2,3,2,3,4,3,4,5});
-
         ASSERT_EQ(9,m_ilist.size());
     }
 
@@ -60,11 +61,9 @@ TYPED_TEST(xmultiset,ctor) {
         ASSERT_EQ(10,m_ipair.size());
 
         mset m_copy(m_ipair);
-        
         ASSERT_EQ(m_ipair.size(),m_copy.size());
 
         mset m_move(std::move(m_ipair));
-        
         ASSERT_EQ(m_copy.size(),m_move.size());
     }
 
@@ -88,14 +87,14 @@ TYPED_TEST(xmultiset,assign) {
 
         m2=m1;
         ASSERT_EQ(10,m2.size());
-    
+
         for (int i=3;i<=5;++i)
             ASSERT_EQ(m1.count(i),m2.count(i));
 
         mset m3({1,2,3,4,3,4,5});
         m3=std::move(m2);
         ASSERT_EQ(10,m3.size());
-    
+
         for (int i=3;i<=5;++i)
             ASSERT_EQ(m1.count(i),m3.count(i));
     }
@@ -131,7 +130,7 @@ TYPED_TEST(xmultiset,clear) {
 TYPED_TEST(xmultiset,equality) {
     using value_type=typename TestFixture::value_type;
     using mset=TypeParam;
-    
+
     mset m1({1,2,3,2,3,4,3,4,5});
     mset m2({5,4,4,2,3,2,3,3,1});
     mset m3({5,4,4,2,3,2,3,3});
@@ -259,7 +258,7 @@ struct eq_mod_k {
     int k;
 };
 
-using multiset_nonstd_eq_types=::testing::Types<tiny_multiset<int,20,eq_mod_k>,tiny_multiset<int_nontrivial,20,eq_mod_k>,small_multiset<int,eq_mod_k>>;
+using multiset_nonstd_eq_types=::testing::Types<tiny::multiset<int,20,eq_mod_k>,tiny::multiset<int_nontrivial,20,eq_mod_k>,small::multiset<int,eq_mod_k>>;
 TYPED_TEST_CASE(xmultiset_nonstd_eq,multiset_nonstd_eq_types);
 
 TYPED_TEST(xmultiset_nonstd_eq,count) {
@@ -270,7 +269,7 @@ TYPED_TEST(xmultiset_nonstd_eq,count) {
     mset m1({1,2,3,4,5});
     ASSERT_EQ(3,m1.count(1));
     ASSERT_EQ(2,m1.count(2));
-    
+
     // test with stateful eq_mod_k, k==3
     mset m2({1,2,3,4,5},eq_mod_k(3));
     ASSERT_EQ(2,m2.count(1));

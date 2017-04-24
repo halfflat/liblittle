@@ -1,7 +1,7 @@
 .PHONY: clean all realclean test bench
 
-tests:=test_comparator test_smallsort test_tiny_multiset test_tiny_map
-benches:=bench_smallsort bench_maps
+tests:=test_comparator test_tinysort test_multiset test_map
+benches:=bench_tinysort bench_multiset
 
 top=..
 sources:=$(wildcard $(top)/test/*.cc) $(wildcard $(top)/bench/*.cc)
@@ -24,7 +24,7 @@ test: $(tests)
 # generate (filtered) assembly for a given smallsort instantation to stdout
 # (run make with -s to avoid output of recipe text)
 
-smallsort-asm-%: smallsort-%.s
+tinysort-asm-%: tinysort-%.s
 	@perl filter-asm.pl "$<"
 
 # compiler flags:
@@ -86,7 +86,7 @@ GBENCH_INCLUDES:=-isystem $(GBENCH_DIR)/include
 
 # liblittle unit tests
 
-obj/test%.o: CPPFLAGS+=$(GTEST_INCLUDES) -I$(top)/include
+obj/test%.o: CPPFLAGS+=$(GTEST_INCLUDES) -I$(top)
 obj/test%.o: test%.cc
 	$(cxx-compile)
 
@@ -99,7 +99,7 @@ test%: obj/test%.o libgtestmain.a
 
 # build benchmark
 
-obj/bench%.o: CPPFLAGS+=-I$(top)/include $(GBENCH_INCLUDES)
+obj/bench%.o: CPPFLAGS+=-I$(top) $(GBENCH_INCLUDES)
 obj/bench%.o: bench%.cc
 	$(cxx-compile)
 
@@ -110,16 +110,16 @@ bench%: obj/bench%.o libbenchmark.a
 
 .PRECIOUS:: bench%
 
-# generate and inspect assembly for small sort implementation:
-# build smallsort-<type><count>.s
+# generate and inspect assembly for tiny sort implementation:
+# build tinysort-<type><count>.s
 
-smallsort-%.s: CPPFLAGS+=-I$(top)/include
-smallsort-%.s: CXXFLAGS:=-std=c++11 $(OPTFLAGS)
-smallsort-%.s: smallsort-%.cc
+tinysort-%.s: CPPFLAGS+=-I$(top)
+tinysort-%.s: CXXFLAGS:=-std=c++11 $(OPTFLAGS)
+tinysort-%.s: tinysort-%.cc
 	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -S -o $@ $^
 
-smallsort-%.cc: mk-smallsort-wrap.pl
-	@perl mk-smallsort-wrap.pl "$*" > $@
+tinysort-%.cc: mk-tinysort-wrap.pl
+	@perl mk-tinysort-wrap.pl "$*" > $@
 
 # include automatically generated dependencies
 -include $(patsubst %.cc,obj/%.d,$(notdir $(sources)))

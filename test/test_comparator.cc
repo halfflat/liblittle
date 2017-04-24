@@ -1,11 +1,11 @@
-#include "compat.h"
+#include "little/compat.h"
 
 #include <type_traits>
 #include <cstdint>
 #include <string>
 #include <gtest/gtest.h>
 
-#include "comparator.h"
+#include "little/comparator.h"
 
 template <typename T>
 struct comparator: public ::testing::Test {
@@ -31,8 +31,9 @@ struct comparator<std::string>: public ::testing::Test {
 };
 
 typedef ::testing::Types<
-    unsigned char, signed char, short, unsigned short, int, unsigned int,
-    long long, unsigned long long, float, double, std::string
+    unsigned char, unsigned short, unsigned, unsigned long, unsigned long long,
+    signed char, short, int, long, long long,
+    char, float, double, std::string
 > test_comp_types;
 
 TYPED_TEST_CASE(comparator, test_comp_types);
