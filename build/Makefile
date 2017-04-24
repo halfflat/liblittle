@@ -1,27 +1,39 @@
 .PHONY: clean all realclean test bench
 
-tests:=test_smallsort test_tiny_multiset test_tiny_map
-benches:=bench_smallsort
+tests:=test_comparator test_smallsort test_tiny_multiset test_tiny_map
+benches:=bench_smallsort bench_maps
 
 top=..
 sources:=$(wildcard $(top)/test/*.cc) $(wildcard $(top)/bench/*.cc)
 
-all: $(tests) $(benches)
+# by default: build all unit tests and benchmarks
+
+all:: $(tests) $(benches)
 
 clean:
-	rm -f gtest-all.o gtest_main.o obj/*.o obj/gbench/*.o obj/gtest/*.o
+	rm -f gtest-all.o gtest_main.o obj/*.o obj/gbench/*.o obj/gtest/*.o smallsort-*.s
 
 realclean: clean
 	rm -f $(tests) $(benches) libbenchmark.a libgtestmain.a obj/*.d obj/gbench/*.d obj/gtest/*.d
 
-OPTFLAGS=-Ofast -march=native
+# run all unit tests with `test` target:
 
-CXXFLAGS=-std=c++11 -g -pthread $(OPTFLAGS) -MMD -MP
+test: $(tests)
+	for test in $^; do ./$$test; done
 
-# directories
+# generate (filtered) assembly for a given smallsort instantation to stdout
+# (run make with -s to avoid output of recipe text)
 
-GTEST_DIR=$(top)/external/gtest/googletest
-GBENCH_DIR=$(top)/external/gbench
+smallsort-asm-%: smallsort-%.s
+	@perl filter-asm.pl "$<"
+
+# compiler flags:
+# `-pthread` required for googletest; `-MMD -MP` for automatic dependency generation
+
+OPTFLAGS?=-O3 -march=native
+CPPFLAGS?=-DHF_USE_ASM_KERNELS
+
+CXXFLAGS:=-std=c++11 -g -pthread $(OPTFLAGS) -MMD -MP
 
 vpath %.h $(top)/include
 vpath test% $(top)/test
@@ -29,69 +41,85 @@ vpath bench% $(top)/bench
 
 $(shell mkdir -p obj obj/gbench obj/gtest)
 
+define cxx-compile
+$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ -c $<
+endef
+
+define cxx-link
+$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+endef
+
+define lib-link
+$(AR) $(ARFLAGS) $@ $^
+endef
+
 # external libraries: gtest, gbench
+
+GTEST_DIR=$(top)/external/gtest/googletest
+GBENCH_DIR=$(top)/external/gbench
 
 # build gtest
 
 gtest_sources=$(GTEST_DIR)/src/gtest-all.cc $(GTEST_DIR)/src/gtest_main.cc
 
-GTEST_INCLUDES:=-isystem $(GTEST_DIR)/include
-GTEST_CPPFLAGS:=$(GTEST_INCLUDES) -I $(GTEST_DIR)
-
+obj/gtest/%.o: CPPFLAGS+=$(GTEST_INCLUDES) -I $(GTEST_DIR)
 obj/gtest/%.o: $(GTEST_DIR)/src/%.cc
-	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $(GTEST_CPPFLAGS) -o $@ -c $<
+	$(cxx-compile)
 
 libgtestmain.a: $(patsubst %.cc,obj/gtest/%.o,$(notdir $(gtest_sources)))
-	$(AR) $(ARFLAGS) $@ $^
+	$(lib-link)
+
+GTEST_INCLUDES:=-isystem $(GTEST_DIR)/include
 
 # build gbench
 
 gbench_sources=$(wildcard $(GBENCH_DIR)/src/*.cc)
 
-GBENCH_INCLUDES:=-isystem $(GBENCH_DIR)/include
-GBENCH_CPPFLAGS:=$(GBENCH_INCLUDES) -DHAVE_STD_REGEX -DNDEBUG
-
+obj/gbench/%.o: CPPFLAGS+=$(GBENCH_INCLUDES) -DHAVE_STD_REGEX -DNDEBUG
 obj/gbench/%.o: $(GBENCH_DIR)/src/%.cc
-	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $(GBENCH_CPPFLAGS) -o $@ -c $^
+	$(cxx-compile)
 
 libbenchmark.a: $(patsubst %.cc,obj/gbench/%.o,$(notdir $(gbench_sources)))
-	$(AR) $(ARFLAGS) $@ $^
+	$(lib-link)
 
-# build tests
+GBENCH_INCLUDES:=-isystem $(GBENCH_DIR)/include
 
-TEST_CPPFLAGS:=$(GTEST_INCLUDES) -I$(top)/incluide
-TEST_LDLIBS:=$(LDLIBS) -L. -lgtestmain
+# liblittle unit tests
 
+obj/test%.o: CPPFLAGS+=$(GTEST_INCLUDES) -I$(top)/include
 obj/test%.o: test%.cc
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -I$(top)/include $(GTEST_INCLUDES) -c -o $@ $<
+	$(cxx-compile)
 
+test%: LDFLAGS+=-L.
+test%: LDLIBS+=-lgtestmain
 test%: obj/test%.o libgtestmain.a
-	$(CXX) $(CXXFLAGS) $(TEST_CPPFLAGS) -o $@ $< $(LDFLAGS) $(TEST_LDLIBS)
+	$(cxx-link)
 
-.PRECIOUS: test% bench%
-
-# run tests
-
-test: $(tests)
-	for test in $^; do ./$$test; done
-
+.PRECIOUS:: test%
 
 # build benchmark
 
-BENCH_CPPFLAGS:=$(GBENCH_INCLUDES) -I$(top)/incluide
-BENCH_LDLIBS:=$(LDLIBS) -L. -lbenchmark
-
+obj/bench%.o: CPPFLAGS+=-I$(top)/include $(GBENCH_INCLUDES)
 obj/bench%.o: bench%.cc
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -I$(top)/include $(GBENCH_INCLUDES) -c -o $@ $<
+	$(cxx-compile)
 
+bench%: LDFLAGS+=-L.
+bench%: LDLIBS+=-lbenchmark
 bench%: obj/bench%.o libbenchmark.a
-	$(CXX) $(CXXFLAGS) $(BENCH_CPPFLAGS) -o $@ $< $(LDFLAGS) $(BENCH_LDLIBS)
+	$(cxx-link)
 
-#
-## run benchmarks
-#bench: $(benches)
-#	./bench_smallsort
-#
+.PRECIOUS:: bench%
+
+# generate and inspect assembly for small sort implementation:
+# build smallsort-<type><count>.s
+
+smallsort-%.s: CPPFLAGS+=-I$(top)/include
+smallsort-%.s: CXXFLAGS:=-std=c++11 $(OPTFLAGS)
+smallsort-%.s: smallsort-%.cc
+	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -S -o $@ $^
+
+smallsort-%.cc: mk-smallsort-wrap.pl
+	@perl mk-smallsort-wrap.pl "$*" > $@
 
 # include automatically generated dependencies
 -include $(patsubst %.cc,obj/%.d,$(notdir $(sources)))

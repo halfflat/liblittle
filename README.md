@@ -43,11 +43,19 @@ above, with the corresponding semantics.
 
 ### `smallsort`
 
-The `smallsort` header offers two templated functions `small_sort` and
-`small_sort_inplace` that use sorting networks for sorting random-access
+The `smallsort` header offers two templated functions `smallsort` and
+`smallsort_inplace` that use sorting networks for sorting random-access
 collections (really, anything supporting [] indexing) of fixed size.
 
-Optimal sorting networks are used up to size 6; larger networks are
-constructed recursively. These sorts will likely be much more
-efficient than a generic sorting routine for arithmetic types when
-the compiler can produce branchless min and max operations.
+Optimal sorting networks are used up to size 6; larger networks are constructed
+recursively. These sorts will likely be much more efficient than a generic
+sorting routine for arithmetic types when the compiler can produce branchless
+min and max operations.
+
+Branchless comparator kernels are provided for x86_64 architecures, which are
+compiled in if the `HP_USE_ASM_KERNELS` preprocessor symbol is defined.
+
+Produced assembly can be examined on the fly with the `smallsort-asm-%`
+targets, where `%` is a label of the form _<type>__<size_>, e.g. `int4`.
+Spaces in the specification can and should be substituted with dashes `-`, e.g.
+`unsigned-int*-3`.

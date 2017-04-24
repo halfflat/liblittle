@@ -59,7 +59,7 @@ TYPED_TEST(smallsort,binary_sort) {
             mask<<=1;
         }
 
-        hf::small_sort_inplace<n>(a);
+        hf::smallsort_inplace<n>(a);
         auto a0=a.begin();
         auto a_end=a.end();
         ASSERT_EQ(0,std::accumulate(a0,a0+(n-c),0));

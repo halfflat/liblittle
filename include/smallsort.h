@@ -1,186 +1,178 @@
-#ifndef SMALLSORT_HPP
-#define SMALLSORT_HPP 1
+#ifndef HF_SMALLSORT_H_
+#define HF_SMALLSORT_H_ 1
 
 /// Inline sorting of small, fixed-size
 /// random-access sequences.
 
 #include <utility>
-#include <algorithm>
 #include <type_traits>
-#include <iostream>
+
+#include "comparator.h"
 
 namespace hf {
 
 namespace impl {
-    template <bool use_min_max=false>
-    struct reorder {
-        template <typename V>
-        static void run(V &a,V &b) {
-            if (a>b) std::swap(a,b);
-        }
-    };
-
-    template <>
-    struct reorder<true> {
-        template <typename V>
-        static void run(V &a,V &b) {
-            V l = std::min(a,b);
-            V u = std::max(a,b);
-            a = l;
-            b = u;
-        }
-    };
-
     template <int m,int n>
     struct S {
-        template <typename A>
-        [[gnu::always_inline]] static void run(A &a) {
-            using value_type=typename std::remove_reference<decltype(a[m])>::type;
-            reorder<std::is_arithmetic<value_type>::value>::run(a[m],a[n]);
+        template <typename A, typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) {
+            c(a[m],a[n]);
         }
     };
 
     // merging networks
 
     // swap m/2 k-spaced pairs (m0,m0+k),(m0+2k,m0+3k),...
-    template <int m,int m0,int k,typename A>
+    template <int m,int m0,int k>
     struct pairwise_exchange {
-        [[gnu::always_inline]] static void run(A &a) {
-            S<m0,m0+k>::run(a);
-            pairwise_exchange<m-2,m0+2*k,k,A>::run(a);
+        template <typename A, typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) {
+            S<m0,m0+k>::run(a,c);
+            pairwise_exchange<m-2,m0+2*k,k>::run(a,c);
         }
     };
 
-    template <int m0,int k,typename A>
-    struct pairwise_exchange<1,m0,k,A> { static void run(A &a) {} };
+    template <int m0,int k>
+    struct pairwise_exchange<1,m0,k> { template <typename A,typename C> static void run(A&,C&&) {} };
 
-    template <int m0,int k,typename A>
-    struct pairwise_exchange<0,m0,k,A> { static void run(A &a) {} };
+    template <int m0,int k>
+    struct pairwise_exchange<0,m0,k> { template <typename A,typename C> static void run(A&,C&&) {} };
+
 
     // merge subsequences [m0,m0+k,m0+2k,...,m0+(m-1)k] amd
     // [n0,n0+k,n0+2k,...,n0+(n-1)k] of A.
-    template <int m,int m0,int n,int n0,int k,typename A>
+    template <int m,int m0,int n,int n0,int k>
     struct merge_subsequences {
-        [[gnu::always_inline]] static void run(A &a) {
+        template <typename A, typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) {
             // merge 'odd' subsequences
-            merge_subsequences<(m+1)/2,m0,(n+1)/2,n0,2*k,A>::run(a);
+            merge_subsequences<(m+1)/2,m0,(n+1)/2,n0,2*k>::run(a,c);
             // merge 'even' subsequences
-            merge_subsequences<m/2,m0+k,n/2,n0+k,2*k,A>::run(a);
+            merge_subsequences<m/2,m0+k,n/2,n0+k,2*k>::run(a,c);
             // pair-wise merge sorted subsequences
-            pairwise_exchange<m-1,m0+k,k,A>::run(a);
+            pairwise_exchange<m-1,m0+k,k>::run(a,c);
 
             constexpr int d=(m+1)%2;
-            if (d) S<m0+(m-1)*k,n0>::run(a);
-            pairwise_exchange<n-d,n0+d*k,k,A>::run(a);
+            if (d) S<m0+(m-1)*k,n0>::run(a,c);
+            pairwise_exchange<n-d,n0+d*k,k>::run(a,c);
         }
     };
 
-    template <int m0,int n,int n0,int k,typename A>
-    struct merge_subsequences<0,m0,n,n0,k,A> { static void run(A &a) {}; };
+    template <int m0,int n,int n0,int k>
+    struct merge_subsequences<0,m0,n,n0,k> { template <typename A,typename C> static void run(A &,C&&) {}; };
 
-    template <int m,int m0,int n0,int k,typename A>
-    struct merge_subsequences<m,m0,0,n0,k,A> { static void run(A &a) {}; };
+    template <int m,int m0,int n0,int k>
+    struct merge_subsequences<m,m0,0,n0,k> { template <typename A,typename C> static void run(A &,C&&) {}; };
 
-    template <int m0,int n0,int k,typename A>
-    struct merge_subsequences<1,m0,1,n0,k,A> {
-        [[gnu::always_inline]] static void run(A &a) { S<m0,n0>::run(a); }
+    template <int m0,int n0,int k>
+    struct merge_subsequences<1,m0,1,n0,k> {
+        template <typename A,typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) { S<m0,n0>::run(a,c); }
     };
 
     // minimal networks up to 6, then recusive merge
 
-    template <int n,int n0,typename A>
-    struct small_sort_inplace {
-        [[gnu::always_inline]] static void run(A &a) {
+    template <int n,int n0>
+    struct smallsort_inplace {
+        template <typename A,typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) {
             constexpr int r=n/2;
-            small_sort_inplace<r,n0,A>::run(a);
-            small_sort_inplace<n-r,n0+r,A>::run(a);
-            merge_subsequences<r,n0,n-r,n0+r,1,A>::run(a);
+            smallsort_inplace<r,n0>::run(a,c);
+            smallsort_inplace<n-r,n0+r>::run(a,c);
+            merge_subsequences<r,n0,n-r,n0+r,1>::run(a,c);
         }
     };
 
-    template <int n0,typename A>
-    struct small_sort_inplace<0,n0,A> {
-        static void run(A &a) {}
+    template <int n0>
+    struct smallsort_inplace<0,n0> {
+        template <typename A,typename C>
+        static void run(A &a,C&& c) {}
     };
 
-    template <int n0,typename A>
-    struct small_sort_inplace<1,n0,A> {
-        static void run(A &a) {}
+    template <int n0>
+    struct smallsort_inplace<1,n0> {
+        template <typename A,typename C>
+        static void run(A &a,C&& c) {}
     };
 
-    template <int n0,typename A>
-    struct small_sort_inplace<2,n0,A> {
-        [[gnu::always_inline]] static void run(A &a) { S<n0,n0+1>::run(a); }
+    template <int n0>
+    struct smallsort_inplace<2,n0> {
+        template <typename A,typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) { S<n0,n0+1>::run(a,c); }
     };
 
-    template <int n0,typename A>
-    struct small_sort_inplace<3,n0,A> {
-        [[gnu::always_inline]] static void run(A &a) {
-            S<n0  ,n0+1>::run(a);
-            S<n0+1,n0+2>::run(a);
-            S<n0  ,n0+1>::run(a);
+    template <int n0>
+    struct smallsort_inplace<3,n0> {
+        template <typename A,typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) {
+            S<n0  ,n0+1>::run(a,c);
+            S<n0+1,n0+2>::run(a,c);
+            S<n0  ,n0+1>::run(a,c);
         }
     };
 
-    template <int n0,typename A>
-    struct small_sort_inplace<4,n0,A> {
-        [[gnu::always_inline]] static void run(A &a) {
-            S<n0  ,n0+1>::run(a);
-            S<n0+2,n0+3>::run(a);
-            S<n0  ,n0+2>::run(a);
-            S<n0+1,n0+3>::run(a);
-            S<n0+1,n0+2>::run(a);
+    template <int n0>
+    struct smallsort_inplace<4,n0> {
+        template <typename A,typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) {
+            S<n0  ,n0+1>::run(a,c);
+            S<n0+2,n0+3>::run(a,c);
+            S<n0  ,n0+2>::run(a,c);
+            S<n0+1,n0+3>::run(a,c);
+            S<n0+1,n0+2>::run(a,c);
         }
     };
 
-    template <int n0,typename A>
-    struct small_sort_inplace<5,n0,A> {
-        [[gnu::always_inline]] static void run(A &a) {
-            S<n0  ,n0+1>::run(a);
-            S<n0+2,n0+4>::run(a);
-            S<n0  ,n0+3>::run(a);
-            S<n0+1,n0+4>::run(a);
-            S<n0+1,n0+2>::run(a);
-            S<n0+3,n0+4>::run(a);
-            S<n0  ,n0+1>::run(a);
-            S<n0+2,n0+3>::run(a);
-            S<n0+1,n0+2>::run(a);
+    template <int n0>
+    struct smallsort_inplace<5,n0> {
+        template <typename A,typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) {
+            S<n0  ,n0+1>::run(a,c);
+            S<n0+2,n0+4>::run(a,c);
+            S<n0  ,n0+3>::run(a,c);
+            S<n0+1,n0+4>::run(a,c);
+            S<n0+1,n0+2>::run(a,c);
+            S<n0+3,n0+4>::run(a,c);
+            S<n0  ,n0+1>::run(a,c);
+            S<n0+2,n0+3>::run(a,c);
+            S<n0+1,n0+2>::run(a,c);
         }
     };
 
-    template <int n0,typename A>
-    struct small_sort_inplace<6,n0,A> {
-        [[gnu::always_inline]] static void run(A &a) {
-            S<n0  ,n0+1>::run(a);
-            S<n0+2,n0+3>::run(a);
-            S<n0+4,n0+5>::run(a);
-            S<n0  ,n0+2>::run(a);
-            S<n0+1,n0+4>::run(a);
-            S<n0+3,n0+5>::run(a);
-            S<n0  ,n0+1>::run(a);
-            S<n0+2,n0+3>::run(a);
-            S<n0+4,n0+5>::run(a);
-            S<n0+1,n0+2>::run(a);
-            S<n0+3,n0+4>::run(a);
-            S<n0+2,n0+3>::run(a);
+    template <int n0>
+    struct smallsort_inplace<6,n0> {
+        template <typename A,typename C>
+        [[gnu::always_inline]] static void run(A &a,C&& c) {
+            S<n0  ,n0+1>::run(a,c);
+            S<n0+2,n0+3>::run(a,c);
+            S<n0+4,n0+5>::run(a,c);
+            S<n0  ,n0+2>::run(a,c);
+            S<n0+1,n0+4>::run(a,c);
+            S<n0+3,n0+5>::run(a,c);
+            S<n0  ,n0+1>::run(a,c);
+            S<n0+2,n0+3>::run(a,c);
+            S<n0+4,n0+5>::run(a,c);
+            S<n0+1,n0+2>::run(a,c);
+            S<n0+3,n0+4>::run(a,c);
+            S<n0+2,n0+3>::run(a,c);
         }
     };
 
+    template <typename A>
+    using value_type_t = typename std::decay<decltype(std::declval<A>()[0])>::type;
 } // namespace impl
 
-template <int n,typename A>
-[[gnu::always_inline]] inline void small_sort_inplace(A &a) {
-    impl::small_sort_inplace<n,0,A>::run(a);
+template <int n,typename A,typename Comparator=::hf::comparator<impl::value_type_t<A>>>
+[[gnu::always_inline]] inline void smallsort_inplace(A &a, Comparator&& comparator = Comparator{}) {
+    impl::smallsort_inplace<n,0>::run(a, comparator);
 }
 
-template <int n,typename A>
-[[gnu::always_inline]] inline A small_sort(A a) {
-    impl::small_sort_inplace<n,0,A>::run(a);
+template <int n,typename A,typename Comparator=::hf::comparator<impl::value_type_t<A>>>
+[[gnu::always_inline]] inline A smallsort(A a, Comparator&& comparator = Comparator{}) {
+    impl::smallsort_inplace<n,0>::run(a, comparator);
     return a;
 }
 
 } // namespace hf
 
-#endif // ndef SMALLSORT_HPP
-
-
+#endif // ndef HF_SMALLSORT_H_

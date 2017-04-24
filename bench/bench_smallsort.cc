@@ -1,3 +1,5 @@
+#include "compat.h"
+
 #include <algorithm>
 #include <cstring>
 #include <random>
@@ -20,7 +22,7 @@ inline T random_val(G& gen) {
 }
 
 template <typename T, unsigned N>
-struct lib {
+struct run_stdsort {
     using value_type = T;
     static constexpr unsigned width = N;
     void operator()(T* v) {
@@ -29,11 +31,11 @@ struct lib {
 };
 
 template <typename T, unsigned N>
-struct small {
+struct run_smallsort {
     using value_type = T;
     static constexpr unsigned width = N;
     void operator()(T* v) {
-        hf::small_sort_inplace<N>(v);
+        hf::smallsort_inplace<N>(v);
     }
 };
 
@@ -48,7 +50,7 @@ void bench(benchmark::State& state) {
     // reps should be large enough to both reduce the
     // effect of timing overhead, and also flummox
     // any branch prediction.
-    constexpr unsigned reps = 1000;
+    constexpr unsigned reps = 10000;
 
     constexpr unsigned N = Sorter::width;
     value_type values_unsorted[N*reps];
@@ -60,6 +62,7 @@ void bench(benchmark::State& state) {
     while (state.KeepRunning()) {
         state.PauseTiming();
         std::copy_n(begin(values_unsorted), N*reps, begin(values));
+        benchmark::ClobberMemory();
 
         state.ResumeTiming();
         value_type* value_ptr = values;
@@ -67,61 +70,88 @@ void bench(benchmark::State& state) {
             sorter(value_ptr);
             value_ptr += N;
         }
-        state.PauseTiming();
+        benchmark::ClobberMemory();
+    }
 
-        value_ptr = values;
-        for (unsigned i=0; i<reps; ++i) {
-            if (!std::is_sorted(value_ptr, value_ptr+N)) throw std::runtime_error("small sort didn't sort");
-            value_ptr += N;
-        }
+    auto value_ptr = values;
+    for (unsigned i=0; i<reps; ++i) {
+        if (!std::is_sorted(value_ptr, value_ptr+N)) throw std::runtime_error("small sort didn't sort");
+        value_ptr += N;
     }
 }
 
-#define by ,
+// Type list chicanery... 
 
-BENCHMARK_TEMPLATE(bench, lib<int by 3>);
-BENCHMARK_TEMPLATE(bench, lib<int by 4>);
-BENCHMARK_TEMPLATE(bench, lib<int by 5>);
-BENCHMARK_TEMPLATE(bench, lib<int by 6>);
-BENCHMARK_TEMPLATE(bench, lib<int by 7>);
-BENCHMARK_TEMPLATE(bench, lib<int by 8>);
-BENCHMARK_TEMPLATE(bench, lib<int by 9>);
-BENCHMARK_TEMPLATE(bench, lib<int by 10>);
-BENCHMARK_TEMPLATE(bench, lib<int by 11>);
-BENCHMARK_TEMPLATE(bench, lib<int by 12>);
+template <typename V, V...>
+struct foreach_value {
+    template <template <V, typename...> class X, typename... Xparam, typename... Args>
+    static void run(Args&&... args) {}
+};
 
-BENCHMARK_TEMPLATE(bench, small<int by 3>);
-BENCHMARK_TEMPLATE(bench, small<int by 4>);
-BENCHMARK_TEMPLATE(bench, small<int by 5>);
-BENCHMARK_TEMPLATE(bench, small<int by 6>);
-BENCHMARK_TEMPLATE(bench, small<int by 7>);
-BENCHMARK_TEMPLATE(bench, small<int by 8>);
-BENCHMARK_TEMPLATE(bench, small<int by 9>);
-BENCHMARK_TEMPLATE(bench, small<int by 10>);
-BENCHMARK_TEMPLATE(bench, small<int by 11>);
-BENCHMARK_TEMPLATE(bench, small<int by 12>);
+template <typename V, V a, V... bs>
+struct foreach_value<V, a, bs...> {
+    template <template <V, typename...> class X, typename... Xparam, typename... Args>
+    static void run(Args&&... args) {
+        X<a, Xparam...> _(args...);
+        foreach_value<V, bs...>::template run<X, Xparam...>(args...);
+    }
+};
 
-BENCHMARK_TEMPLATE(bench, lib<double by 3>);
-BENCHMARK_TEMPLATE(bench, lib<double by 4>);
-BENCHMARK_TEMPLATE(bench, lib<double by 5>);
-BENCHMARK_TEMPLATE(bench, lib<double by 6>);
-BENCHMARK_TEMPLATE(bench, lib<double by 7>);
-BENCHMARK_TEMPLATE(bench, lib<double by 8>);
-BENCHMARK_TEMPLATE(bench, lib<double by 9>);
-BENCHMARK_TEMPLATE(bench, lib<double by 10>);
-BENCHMARK_TEMPLATE(bench, lib<double by 11>);
-BENCHMARK_TEMPLATE(bench, lib<double by 12>);
+template <typename...>
+struct foreach_type {
+    template <template <typename...> class X, typename... Xparam, typename... Args>
+    static void run(Args&&... args) {}
+};
 
-BENCHMARK_TEMPLATE(bench, small<double by 3>);
-BENCHMARK_TEMPLATE(bench, small<double by 4>);
-BENCHMARK_TEMPLATE(bench, small<double by 5>);
-BENCHMARK_TEMPLATE(bench, small<double by 6>);
-BENCHMARK_TEMPLATE(bench, small<double by 7>);
-BENCHMARK_TEMPLATE(bench, small<double by 8>);
-BENCHMARK_TEMPLATE(bench, small<double by 9>);
-BENCHMARK_TEMPLATE(bench, small<double by 10>);
-BENCHMARK_TEMPLATE(bench, small<double by 11>);
-BENCHMARK_TEMPLATE(bench, small<double by 12>);
+template <typename H, typename... Tail>
+struct foreach_type<H, Tail...> {
+    template <template <typename...> class X, typename... Xparam, typename... Args>
+    static void run(Args&&... args) {
+        X<H, Xparam...> _(args...);
+        foreach_type<Tail...>::template run<X, Xparam...>(args...);
+    }
+};
 
+// Benchmark registration...
 
-BENCHMARK_MAIN();
+std::string type_name(short) { return "short"; }
+std::string type_name(unsigned short) { return "ushort"; }
+std::string type_name(int) { return "int"; }
+std::string type_name(unsigned) { return "uint"; }
+std::string type_name(float) { return "float"; }
+std::string type_name(double) { return "double"; }
+
+template <int n, typename V>
+struct register_smallsort_bench {
+    register_smallsort_bench() {
+        auto name = "smallsort/"+type_name(V{})+"/"+std::to_string(n);
+        benchmark::RegisterBenchmark(name.c_str(), bench<run_smallsort<V, n>>);
+    }
+};
+
+template <int n, typename V>
+struct register_stdsort_bench {
+    register_stdsort_bench() {
+        auto name = "stdsort/"+type_name(V{})+"/"+std::to_string(n);
+        benchmark::RegisterBenchmark(name.c_str(), bench<run_stdsort<V, n>>);
+    }
+};
+
+template <int...> struct intlist {};
+template <typename, typename> struct register_benches;
+
+template <typename V, int... sizes>
+struct register_benches<V, intlist<sizes...>> {
+    register_benches() {
+        foreach_value<int, sizes...>::template run<register_smallsort_bench, V>();
+        foreach_value<int, sizes...>::template run<register_stdsort_bench, V>();
+    }
+};
+
+int main(int argc,char** argv) {
+    using sizes = intlist<3,4,5,6,7,8,9,10,11,12,13,14,15,20,25,30,35,40,45>;
+    foreach_type<short, unsigned short, int, unsigned, float, double>::run<register_benches, sizes>();
+
+    benchmark::Initialize(&argc, argv);
+    benchmark::RunSpecifiedBenchmarks();
+}
