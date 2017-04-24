@@ -11,7 +11,7 @@ sources:=$(wildcard $(top)/test/*.cc) $(wildcard $(top)/bench/*.cc)
 all:: $(tests) $(benches)
 
 clean:
-	rm -f gtest-all.o gtest_main.o obj/*.o obj/gbench/*.o obj/gtest/*.o smallsort-*.s
+	rm -f gtest-all.o gtest_main.o obj/*.o obj/gbench/*.o obj/gtest/*.o
 
 realclean: clean
 	rm -f $(tests) $(benches) libbenchmark.a libgtestmain.a obj/*.d obj/gbench/*.d obj/gtest/*.d
@@ -21,7 +21,7 @@ realclean: clean
 test: $(tests)
 	for test in $^; do ./$$test; done
 
-# generate (filtered) assembly for a given smallsort instantation to stdout
+# generate (filtered) assembly for a given tiny::sort instantation to stdout
 # (run make with -s to avoid output of recipe text)
 
 tinysort-asm-%: tinysort-%.s
