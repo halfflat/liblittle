@@ -56,6 +56,6 @@ Branchless comparator kernels are provided for x86_64 architecures, which are
 compiled in if the `HP_USE_ASM_KERNELS` preprocessor symbol is defined.
 
 Produced assembly can be examined on the fly with the `smallsort-asm-%`
-targets, where `%` is a label of the form _<type>__<size_>, e.g. `int4`.
+targets, where `%` is a label of the form _&lt;type&gt;&lt;size&gt;_, e.g. `int4`.
 Spaces in the specification can and should be substituted with dashes `-`, e.g.
 `unsigned-int*-3`.
