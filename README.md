@@ -53,7 +53,7 @@ sorting routine for arithmetic types when the compiler can produce branchless
 min and max operations.
 
 Branchless comparator kernels are provided for x86_64 architecures, which are
-compiled in if the `HP_USE_ASM_KERNELS` preprocessor symbol is defined.
+compiled in if the `HF_USE_ASM_KERNELS` preprocessor symbol is defined.
 
 Produced assembly can be examined on the fly with the `smallsort-asm-%`
 targets, where `%` is a label of the form _&lt;type&gt;&lt;size&gt;_, e.g. `int4`.
